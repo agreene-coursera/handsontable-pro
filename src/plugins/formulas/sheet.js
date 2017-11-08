@@ -118,12 +118,11 @@ class Sheet {
   recalculateFull() {
     const cells = this.dataProvider.getSourceDataByRange();
 
-    this.matrix.reset();
-
     arrayEach(cells, (rowData, row) => {
       arrayEach(rowData, (value, column) => {
         if (isFormulaExpression(value)) {
-          this.parseExpression(new CellValue(row, column), value.substr(1));
+          const cellValue = this.matrix.getCellAt(row, column) || new CellValue(row, column);
+          this.parseExpression(cellValue, value.substr(1));
         }
       });
     });
