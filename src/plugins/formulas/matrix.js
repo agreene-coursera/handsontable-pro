@@ -110,16 +110,12 @@ class Matrix {
    *
    * @param {Object} cellCoord Visual cell coordinates object.
    */
-  getDependencies(cellCoord) {
+  getDependencies({ row, column }) {
     /* eslint-disable arrow-body-style */
     const getDependencies = (cell) => {
-      return arrayReduce(this.data, (acc, cellValue) => {
-        if (cellValue.hasPrecedent(cell) && acc.indexOf(cellValue) === -1) {
-          acc.push(cellValue);
-        }
-
-        return acc;
-      }, []);
+      cell.getDependents()
+        .map((dep) => this.data
+          .find((cellValue) => cellValue.isEqual(dep)));
     };
 
     const getTotalDependencies = (cell) => {
@@ -127,7 +123,7 @@ class Matrix {
 
       if (deps.length) {
         arrayEach(deps, (cellValue) => {
-          if (cellValue.hasPrecedents()) {
+          if (cellValue.hasDependents()) {
             deps = deps.concat(getTotalDependencies(this.t.toVisual(cellValue)));
           }
         });
@@ -136,7 +132,7 @@ class Matrix {
       return deps;
     };
 
-    return getTotalDependencies(cellCoord);
+    return getTotalDependencies(this.getCellAt(row, column));
   }
 
   /**

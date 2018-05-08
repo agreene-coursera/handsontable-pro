@@ -1,9 +1,7 @@
 import {Parser, ERROR_REF, error as isFormulaError} from 'hot-formula-parser';
 import {arrayEach, arrayMap} from 'handsontable/helpers/array';
-import {rangeEach} from 'handsontable/helpers/number';
 import localHooks from 'handsontable/mixins/localHooks';
 import {getTranslator} from 'handsontable/utils/recordTranslator';
-import {objectEach, mixin} from 'handsontable/helpers/object';
 import CellValue from './cell/value';
 import CellReference from './cell/reference';
 import {isFormulaExpression, toUpperCaseFormula} from './utils';
@@ -233,23 +231,32 @@ class Sheet {
    * @param {Function} done Function to call with valid cell value.
    */
   _onCallCellValue({row, column}, done) {
-    const cell = new CellReference(row, column);
-
-    if (!this.dataProvider.isInDataRange(cell.row, cell.column)) {
+    if (!this.dataProvider.isInDataRange(row.index, column.index)) {
       throw Error(ERROR_REF);
     }
 
-    this.matrix.registerCellRef(cell);
-    this._processingCell.addPrecedent(cell);
+    const precedentCellRef = new CellReference(row, column);
+
+    const dependentCellRef = new CellReference(this._processingCell.row, this._processingCell.column);
+
+    this.matrix.registerCellRef(precedentCellRef);
+    this.matrix.registerCellRef(dependentCellRef);
+    this._processingCell.addPrecedent(precedentCellRef);
+
+    let precedentCellValue;
+    if (this.matrix.getCellAt(row.index, column.index)) {
+      precedentCellValue = this.matrix.getCellAt(row.index, column.index);
+      precedentCellValue.addDependent(dependentCellRef);
+    } else {
+      precedentCellValue = new CellValue(row, col);
+      precedentCellValue.addDependent(dependentCellRef);
+      this.matrix.add(precedentCellValue);
+    }
 
     const cellValue = this.dataProvider.getRawDataAtCell(row.index, column.index);
 
-    if (isFormulaError(cellValue)) {
-      const computedCell = this.matrix.getCellAt(row.index, column.index);
-
-      if (computedCell && computedCell.hasError()) {
-        throw Error(cellValue);
-      }
+    if (isFormulaError(cellValue) && precedentCellValue.hasError()) {
+      throw Error(cellValue);
     }
 
     if (isFormulaExpression(cellValue)) {
@@ -279,14 +286,28 @@ class Sheet {
     const mapRowData = (rowData, rowIndex) => arrayMap(rowData, (cellData, columnIndex) => {
       const rowCellCoord = startRow.index + rowIndex;
       const columnCellCoord = startColumn.index + columnIndex;
-      const cell = new CellReference(rowCellCoord, columnCellCoord);
 
-      if (!this.dataProvider.isInDataRange(cell.row, cell.column)) {
+      if (!this.dataProvider.isInDataRange(rowCellCoord, columnCellCoord)) {
         throw Error(ERROR_REF);
       }
 
-      this.matrix.registerCellRef(cell);
-      this._processingCell.addPrecedent(cell);
+      const precedentCellRef = new CellReference(rowCellCoord, columnCellCoord);
+
+      const dependentCellRef = new CellReference(this._processingCell.row, this._processingCell.column);
+
+      this.matrix.registerCellRef(precedentCellRef);
+      this.matrix.registerCellRef(dependentCellRef);
+      this._processingCell.addPrecedent(precedentCellRef);
+
+      let precedentCellValue;
+      if (this.matrix.getCellAt(rowCellCoord, columnCellCoord)) {
+        precedentCellValue = this.matrix.getCellAt(rowCellCoord, columnCellCoord);
+        precedentCellValue.addDependent(dependentCellRef);
+      } else {
+        precedentCellValue = new CellValue(rowCellCoord, columnCellCoord);
+        precedentCellValue.addDependent(dependentCellRef);
+        this.matrix.add(precedentCellValue);
+      }
 
       if (isFormulaError(cellData)) {
         const computedCell = this.matrix.getCellAt(cell.row, cell.column);

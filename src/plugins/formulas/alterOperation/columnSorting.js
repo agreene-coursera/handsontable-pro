@@ -38,6 +38,7 @@ export function operate() {
   arrayEach(matrix.data, (cell) => {
     cell.setState(CellValue.STATE_OUT_OFF_DATE);
     cell.clearPrecedents();
+    cell.clearDependents();
 
     const {row, column} = cell;
     const value = dataProvider.getSourceDataAtCell(row, column);
