@@ -21,7 +21,7 @@
  * UNINTERRUPTED OR ERROR FREE.
  * 
  * Version: 2.0.0
- * Release date: 11/04/2018 (built at 08/05/2018 10:14:28)
+ * Release date: 11/04/2018 (built at 08/05/2018 16:05:14)
  */
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
@@ -7929,6 +7929,23 @@ var CellValue = function (_BaseCell) {
     }
 
     /**
+     * Add dependent cell to the collection.
+     *
+     * @param {CellReference} cellReference Cell reference object.
+     */
+
+  }, {
+    key: 'addDependent',
+    value: function addDependent(cellReference) {
+      if (this.isEqual(cellReference)) {
+        throw Error(_hotFormulaParser.ERROR_REF);
+      }
+      if (!this.hasDependent(cellReference)) {
+        this.dependents.push(cellReference);
+      }
+    }
+
+    /**
      * Remove precedent cell from the collection.
      *
      * @param {CellReference} cellReference Cell reference object.
@@ -7946,6 +7963,23 @@ var CellValue = function (_BaseCell) {
     }
 
     /**
+     * Remove dependent cell from the collection.
+     *
+     * @param {CellReference} cellReference Cell reference object.
+     */
+
+  }, {
+    key: 'removeDependent',
+    value: function removeDependent(cellReference) {
+      if (this.isEqual(cellReference)) {
+        throw Error(_hotFormulaParser.ERROR_REF);
+      }
+      this.precedents = (0, _array.arrayFilter)(this.dependents, function (cell) {
+        return !cell.isEqual(cellReference);
+      });
+    }
+
+    /**
      * Clear all precedent cells.
      */
 
@@ -7956,15 +7990,25 @@ var CellValue = function (_BaseCell) {
     }
 
     /**
-     * Get precedent cells.
+     * Clear all dependent cells.
+     */
+
+  }, {
+    key: 'clearDependents',
+    value: function clearDependents() {
+      this.dependents.length = 0;
+    }
+
+    /**
+     * Get dependent cells.
      *
      * @returns {Array}
      */
 
   }, {
-    key: 'getPrecedents',
-    value: function getPrecedents() {
-      return this.precedents;
+    key: 'getDependents',
+    value: function getDependents() {
+      return this.dependents;
     }
 
     /**
@@ -7980,7 +8024,19 @@ var CellValue = function (_BaseCell) {
     }
 
     /**
-     * Check if cell reference is precedents this cell.
+     * Check if cell value has dependent cells.
+     *
+     * @returns {Boolean}
+     */
+
+  }, {
+    key: 'hasDependents',
+    value: function hasDependents() {
+      return this.dependents.length > 0;
+    }
+
+    /**
+     * Check if cell reference is precedent to this cell.
      *
      * @param {CellReference} cellReference Cell reference object.
      * @returns {Boolean}
@@ -7990,6 +8046,21 @@ var CellValue = function (_BaseCell) {
     key: 'hasPrecedent',
     value: function hasPrecedent(cellReference) {
       return (0, _array.arrayFilter)(this.precedents, function (cell) {
+        return cell.isEqual(cellReference);
+      }).length > 0;
+    }
+
+    /**
+     * Check if cell reference is dependent on this cell.
+     *
+     * @param {CellReference} cellReference Cell reference object.
+     * @returns {Boolean}
+     */
+
+  }, {
+    key: 'hasDependent',
+    value: function hasDependent(cellReference) {
+      return (0, _array.arrayFilter)(this.dependents, function (cell) {
         return cell.isEqual(cellReference);
       }).length > 0;
     }
@@ -34040,7 +34111,7 @@ Handsontable.DefaultSettings = _defaultSettings2.default;
 Handsontable.EventManager = _eventManager2.default;
 Handsontable._getListenersCounter = _eventManager.getListenersCounter; // For MemoryLeak tests
 
-Handsontable.buildDate = '08/05/2018 10:14:28';
+Handsontable.buildDate = '08/05/2018 16:05:14';
 Handsontable.packageName = 'handsontable-pro';
 Handsontable.version = '2.0.0';
 
@@ -67711,15 +67782,11 @@ var _hotFormulaParser = __webpack_require__(69);
 
 var _array = __webpack_require__(0);
 
-var _number = __webpack_require__(4);
-
 var _localHooks = __webpack_require__(21);
 
 var _localHooks2 = _interopRequireDefault(_localHooks);
 
 var _recordTranslator = __webpack_require__(54);
-
-var _object = __webpack_require__(1);
 
 var _value = __webpack_require__(46);
 
@@ -68018,23 +68085,32 @@ var Sheet = function () {
       var row = _ref.row,
           column = _ref.column;
 
-      var cell = new _reference2.default(row, column);
-
-      if (!this.dataProvider.isInDataRange(cell.row, cell.column)) {
+      if (!this.dataProvider.isInDataRange(row.index, column.index)) {
         throw Error(_hotFormulaParser.ERROR_REF);
       }
 
-      this.matrix.registerCellRef(cell);
-      this._processingCell.addPrecedent(cell);
+      var precedentCellRef = new _reference2.default(row, column);
+
+      var dependentCellRef = new _reference2.default(this._processingCell.row, this._processingCell.column);
+
+      this.matrix.registerCellRef(precedentCellRef);
+      this.matrix.registerCellRef(dependentCellRef);
+      this._processingCell.addPrecedent(precedentCellRef);
+
+      var precedentCellValue = void 0;
+      if (this.matrix.getCellAt(row.index, column.index)) {
+        precedentCellValue = this.matrix.getCellAt(row.index, column.index);
+        precedentCellValue.addDependent(dependentCellRef);
+      } else {
+        precedentCellValue = new _value2.default(row, col);
+        precedentCellValue.addDependent(dependentCellRef);
+        this.matrix.add(precedentCellValue);
+      }
 
       var cellValue = this.dataProvider.getRawDataAtCell(row.index, column.index);
 
-      if ((0, _hotFormulaParser.error)(cellValue)) {
-        var computedCell = this.matrix.getCellAt(row.index, column.index);
-
-        if (computedCell && computedCell.hasError()) {
-          throw Error(cellValue);
-        }
+      if ((0, _hotFormulaParser.error)(cellValue) && precedentCellValue.hasError()) {
+        throw Error(cellValue);
       }
 
       if ((0, _utils.isFormulaExpression)(cellValue)) {
@@ -68078,14 +68154,28 @@ var Sheet = function () {
         return (0, _array.arrayMap)(rowData, function (cellData, columnIndex) {
           var rowCellCoord = startRow.index + rowIndex;
           var columnCellCoord = startColumn.index + columnIndex;
-          var cell = new _reference2.default(rowCellCoord, columnCellCoord);
 
-          if (!_this4.dataProvider.isInDataRange(cell.row, cell.column)) {
+          if (!_this4.dataProvider.isInDataRange(rowCellCoord, columnCellCoord)) {
             throw Error(_hotFormulaParser.ERROR_REF);
           }
 
-          _this4.matrix.registerCellRef(cell);
-          _this4._processingCell.addPrecedent(cell);
+          var precedentCellRef = new _reference2.default(rowCellCoord, columnCellCoord);
+
+          var dependentCellRef = new _reference2.default(_this4._processingCell.row, _this4._processingCell.column);
+
+          _this4.matrix.registerCellRef(precedentCellRef);
+          _this4.matrix.registerCellRef(dependentCellRef);
+          _this4._processingCell.addPrecedent(precedentCellRef);
+
+          var precedentCellValue = void 0;
+          if (_this4.matrix.getCellAt(rowCellCoord, columnCellCoord)) {
+            precedentCellValue = _this4.matrix.getCellAt(rowCellCoord, columnCellCoord);
+            precedentCellValue.addDependent(dependentCellRef);
+          } else {
+            precedentCellValue = new _value2.default(rowCellCoord, columnCellCoord);
+            precedentCellValue.addDependent(dependentCellRef);
+            _this4.matrix.add(precedentCellValue);
+          }
 
           if ((0, _hotFormulaParser.error)(cellData)) {
             var computedCell = _this4.matrix.getCellAt(cell.row, cell.column);
@@ -68152,7 +68242,7 @@ var Sheet = function () {
   return Sheet;
 }();
 
-(0, _object.mixin)(Sheet, _localHooks2.default);
+mixin(Sheet, _localHooks2.default);
 
 exports.default = Sheet;
 
@@ -68369,18 +68459,19 @@ var Matrix = function () {
 
   }, {
     key: 'getDependencies',
-    value: function getDependencies(cellCoord) {
+    value: function getDependencies(_ref) {
       var _this = this;
+
+      var row = _ref.row,
+          column = _ref.column;
 
       /* eslint-disable arrow-body-style */
       var getDependencies = function getDependencies(cell) {
-        return (0, _array.arrayReduce)(_this.data, function (acc, cellValue) {
-          if (cellValue.hasPrecedent(cell) && acc.indexOf(cellValue) === -1) {
-            acc.push(cellValue);
-          }
-
-          return acc;
-        }, []);
+        cell.getDependents().map(function (dep) {
+          return _this.data.find(function (cellValue) {
+            return cellValue.isEqual(dep);
+          });
+        });
       };
 
       var getTotalDependencies = function getTotalDependencies(cell) {
@@ -68388,7 +68479,7 @@ var Matrix = function () {
 
         if (deps.length) {
           (0, _array.arrayEach)(deps, function (cellValue) {
-            if (cellValue.hasPrecedents()) {
+            if (cellValue.hasDependents()) {
               deps = deps.concat(getTotalDependencies(_this.t.toVisual(cellValue)));
             }
           });
@@ -68397,7 +68488,7 @@ var Matrix = function () {
         return deps;
       };
 
-      return getTotalDependencies(cellCoord);
+      return getTotalDependencies(this.getCellAt(row, column));
     }
 
     /**
@@ -68426,11 +68517,11 @@ var Matrix = function () {
 
   }, {
     key: 'removeCellRefsAtRange',
-    value: function removeCellRefsAtRange(_ref, _ref2) {
-      var startRow = _ref.row,
-          startColumn = _ref.column;
-      var endRow = _ref2.row,
-          endColumn = _ref2.column;
+    value: function removeCellRefsAtRange(_ref2, _ref3) {
+      var startRow = _ref2.row,
+          startColumn = _ref2.column;
+      var endRow = _ref3.row,
+          endColumn = _ref3.column;
 
       var removed = [];
 
@@ -68712,6 +68803,7 @@ function operate() {
   (0, _array.arrayEach)(matrix.data, function (cell) {
     cell.setState(_value2.default.STATE_OUT_OFF_DATE);
     cell.clearPrecedents();
+    cell.clearDependents();
 
     var row = cell.row,
         column = cell.column;
