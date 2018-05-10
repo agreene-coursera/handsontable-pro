@@ -61,9 +61,8 @@ class Matrix {
     return arrayFilter(cellValue.getPrecedents(), ({row, column}) => {
       const cell = this.getCellAt(row, column);
       return cell && !cell.isState(CellValue.STATE_UP_TO_DATE);
-
     }
-    ).length !== 0;
+    ).length === 0;
   }
 
   /**
