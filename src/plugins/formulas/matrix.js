@@ -112,7 +112,7 @@ class Matrix {
   getDependencies({ row, column }) {
     /* eslint-disable arrow-body-style */
     const getDependencies = (cell) => {
-      return cell ? cell.getDependents().map((dep) => this.getCellAt(dep.row, dep.column)) : [];
+      return cell ? cell.getDependents().map((dep) => this.getCellAt(dep.row, dep.column)).filter((dep) => !!dep) : [];
     };
 
     const getTotalDependencies = (cell) => {
@@ -121,7 +121,9 @@ class Matrix {
       if (deps.length) {
         arrayEach(deps, (cellValue) => {
           if (cellValue.hasDependents()) {
-            deps = deps.concat(getTotalDependencies(this.t.toVisual(cellValue)));
+            const depVisualCoords = this.t.toVisual(cellValue);
+            const depCellValue = this.getCellAt(depVisualCoords.row, depVisualCoords.column);
+            deps = deps.concat(getTotalDependencies(depCellValue));
           }
         });
       }

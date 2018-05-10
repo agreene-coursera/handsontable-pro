@@ -96,7 +96,7 @@ class Sheet {
   /**
    * Recalculate sheet using optimized methods (fast recalculation).
    */
-  recalculateOptimized() {
+  recalculateOptimized(depth = 5) {
     const cells = this.matrix.getOutOfDateCells();
     let hasUncomputedFormulas = false;
 
@@ -112,8 +112,8 @@ class Sheet {
       }
     });
 
-    if (hasUncomputedFormulas) {
-      this.recalculateOptimized();
+    if (hasUncomputedFormulas && depth > 0) {
+      this.recalculateOptimized(depth - 1);
     } else {
       this._state = STATE_UP_TO_DATE;
       this.runLocalHooks('afterRecalculate', cells, 'optimized');

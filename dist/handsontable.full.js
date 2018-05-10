@@ -21,7 +21,7 @@
  * UNINTERRUPTED OR ERROR FREE.
  * 
  * Version: 2.0.0
- * Release date: 11/04/2018 (built at 10/05/2018 14:54:50)
+ * Release date: 11/04/2018 (built at 10/05/2018 16:09:59)
  */
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
@@ -57889,7 +57889,7 @@ Handsontable.DefaultSettings = _defaultSettings2.default;
 Handsontable.EventManager = _eventManager2.default;
 Handsontable._getListenersCounter = _eventManager.getListenersCounter; // For MemoryLeak tests
 
-Handsontable.buildDate = '10/05/2018 14:54:50';
+Handsontable.buildDate = '10/05/2018 16:09:59';
 Handsontable.packageName = 'handsontable-pro';
 Handsontable.version = '2.0.0';
 
@@ -97934,6 +97934,8 @@ var Sheet = function () {
     value: function recalculateOptimized() {
       var _this2 = this;
 
+      var depth = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 5;
+
       var cells = this.matrix.getOutOfDateCells();
       var hasUncomputedFormulas = false;
 
@@ -97949,8 +97951,8 @@ var Sheet = function () {
         }
       });
 
-      if (hasUncomputedFormulas) {
-        this.recalculateOptimized();
+      if (hasUncomputedFormulas && depth > 0) {
+        this.recalculateOptimized(depth - 1);
       } else {
         this._state = STATE_UP_TO_DATE;
         this.runLocalHooks('afterRecalculate', cells, 'optimized');
@@ -98510,6 +98512,8 @@ var Matrix = function () {
       var getDependencies = function getDependencies(cell) {
         return cell ? cell.getDependents().map(function (dep) {
           return _this3.getCellAt(dep.row, dep.column);
+        }).filter(function (dep) {
+          return !!dep;
         }) : [];
       };
 
@@ -98519,7 +98523,9 @@ var Matrix = function () {
         if (deps.length) {
           (0, _array.arrayEach)(deps, function (cellValue) {
             if (cellValue.hasDependents()) {
-              deps = deps.concat(getTotalDependencies(_this3.t.toVisual(cellValue)));
+              var depVisualCoords = _this3.t.toVisual(cellValue);
+              var depCellValue = _this3.getCellAt(depVisualCoords.row, depVisualCoords.column);
+              deps = deps.concat(getTotalDependencies(depCellValue));
             }
           });
         }
