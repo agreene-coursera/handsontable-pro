@@ -26,9 +26,9 @@ class Matrix {
     /**
      * List of all cell values with theirs precedents.
      *
-     * @type {Array}
+     * @type {Map}
      */
-    this.data = [];
+    this.data = new Map();
     /**
      * List of all created and registered cell references.
      *
@@ -45,17 +45,7 @@ class Matrix {
    * @returns {CellValue|null} Returns CellValue instance or `null` if cell not found.
    */
   getCellAt(row, column) {
-    let result = null;
-
-    arrayEach(this.data, (cell) => {
-      if (cell.row === row && cell.column === column) {
-        result = cell;
-
-        return false;
-      }
-    });
-
-    return result;
+    return this.data.get(`${row}, ${column}`) || null;
   }
 
   /**
@@ -64,7 +54,16 @@ class Matrix {
    * @returns {Array}
    */
   getOutOfDateCells() {
-    return arrayFilter(this.data, (cell) => cell.isState(CellValue.STATE_OUT_OFF_DATE));
+    return arrayFilter(this.data.values(), (cell) => cell.isState(CellValue.STATE_OUT_OFF_DATE));
+  }
+
+  getCellPrecedentsUpToDate(cellValue) {
+    return arrayFilter(cellValue.getPrecedents(), ({row, column}) => {
+      const cell = this.getCellAt(row, column);
+      return cell && !cell.isState(CellValue.STATE_UP_TO_DATE);
+
+    }
+    ).length !== 0;
   }
 
   /**
@@ -73,8 +72,9 @@ class Matrix {
    * @param {CellValue|Object} cellValue Cell value object.
    */
   add(cellValue) {
-    if (!arrayFilter(this.data, (cell) => cell.isEqual(cellValue)).length) {
-      this.data.push(cellValue);
+    const { row, column } = cellValue;
+    if (!this.getCellAt(row, column)) {
+      this.data.set(`${row}, ${column}`, cellValue);
     }
   }
 
@@ -85,24 +85,23 @@ class Matrix {
    */
   remove(cellValue) {
     const isArray = Array.isArray(cellValue);
-    const isEqual = (cell, cellValue) => {
-      let result = false;
+    if (isArray) {
+      arrayEach(cellValue, ({row, column}) => this.data.delete(`${row}, ${column}`));
+    } else {
+      this.data.delete(`${cellValue.row}, ${cellValue.column}`);
+    }
+  }
 
-      if (isArray) {
-        arrayEach(cellValue, (value) => {
-          if (cell.isEqual(value)) {
-            result = true;
-
-            return false;
-          }
-        });
-      } else {
-        result = cell.isEqual(cellValue);
+  translateCells(start, translate) {
+    this.data = arrayReduce(this.data.values(), (map, cell) => {
+      if (cell.column >= start) {
+        cell.translateTo(...translate);
+        cell.setState(CellValue.STATE_OUT_OFF_DATE);
       }
 
-      return result;
-    };
-    this.data = arrayFilter(this.data, (cell) => !isEqual(cell, cellValue));
+      map.set(`${cell.row}, ${cell.column}`, cell);
+      return map;
+    }, new Map());
   }
 
   /**
@@ -113,9 +112,7 @@ class Matrix {
   getDependencies({ row, column }) {
     /* eslint-disable arrow-body-style */
     const getDependencies = (cell) => {
-      cell.getDependents()
-        .map((dep) => this.data
-          .find((cellValue) => cellValue.isEqual(dep)));
+      return cell ? cell.getDependents().map((dep) => this.getCellAt(dep.row, dep.column)) : [];
     };
 
     const getTotalDependencies = (cell) => {
@@ -176,7 +173,7 @@ class Matrix {
    * Reset matrix data.
    */
   reset() {
-    this.data.length = 0;
+    this.data = new Map();
     this.cellReferences.length = 0;
   }
 }

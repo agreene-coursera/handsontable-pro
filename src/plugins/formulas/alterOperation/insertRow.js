@@ -31,14 +31,10 @@ export function operate(start, amount, modifyFormula = true) {
     }
   });
 
-  arrayEach(matrix.data, (cell) => {
+  matrix.translateCells(start, translate);
+
+  arrayEach(matrix.data.values(), (cell) => {
     const {row: origRow, column: origColumn} = cell;
-
-    if (cell.row >= start) {
-      cell.translateTo(...translate);
-      cell.setState(CellValue.STATE_OUT_OFF_DATE);
-    }
-
     if (modifyFormula) {
       const {row, column} = cell;
       const value = dataProvider.getSourceDataAtCell(row, column);

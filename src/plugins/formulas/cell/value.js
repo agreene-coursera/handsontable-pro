@@ -47,11 +47,19 @@ class CellValue extends BaseCell {
     super(row, column);
 
     /**
-     * List of precedents cells.
+     * List of precedent cells.
      *
      * @type {Array}
      */
     this.precedents = [];
+
+    /**
+     * List of dependent cells.
+     *
+     * @type {Array}
+     */
+    this.dependents = [];
+
     /**
      * Computed value.
      *
@@ -202,6 +210,15 @@ class CellValue extends BaseCell {
    */
   clearDependents() {
     this.dependents.length = 0;
+  }
+
+  /**
+   * Get precedent cells.
+   *
+   * @returns {Array}
+   */
+  getPrecedents() {
+    return this.precedents;
   }
 
   /**

@@ -2,6 +2,7 @@ import {Parser, ERROR_REF, error as isFormulaError} from 'hot-formula-parser';
 import {arrayEach, arrayMap} from 'handsontable/helpers/array';
 import localHooks from 'handsontable/mixins/localHooks';
 import {getTranslator} from 'handsontable/utils/recordTranslator';
+import {mixin} from 'handsontable/helpers/object';
 import CellValue from './cell/value';
 import CellReference from './cell/reference';
 import {isFormulaExpression, toUpperCaseFormula} from './utils';
@@ -97,17 +98,26 @@ class Sheet {
    */
   recalculateOptimized() {
     const cells = this.matrix.getOutOfDateCells();
+    let hasUncomputedFormulas = false;
 
     arrayEach(cells, (cellValue) => {
-      const value = this.dataProvider.getSourceDataAtCell(cellValue.row, cellValue.column);
+      if (this.matrix.getCellPrecedentsUpToDate(cellValue)) {
+        const value = this.dataProvider.getSourceDataAtCell(cellValue.row, cellValue.column);
 
-      if (isFormulaExpression(value)) {
-        this.parseExpression(cellValue, value.substr(1));
+        if (isFormulaExpression(value)) {
+          this.parseExpression(cellValue, value.substr(1));
+        }
+      } else {
+        hasUncomputedFormulas = true;
       }
     });
 
-    this._state = STATE_UP_TO_DATE;
-    this.runLocalHooks('afterRecalculate', cells, 'optimized');
+    if (hasUncomputedFormulas) {
+      this.recalculateOptimized();
+    } else {
+      this._state = STATE_UP_TO_DATE;
+      this.runLocalHooks('afterRecalculate', cells, 'optimized');
+    }
   }
 
   /**
@@ -159,12 +169,18 @@ class Sheet {
   applyChanges(row, column, newValue) {
     // Remove formula description for old expression
     // TODO: Move this to recalculate()
+    const oldCellValue = this.matrix.getCellAt(row, column);
     this.matrix.remove({row, column});
 
     // TODO: Move this to recalculate()
     if (isFormulaExpression(newValue)) {
       // ...and create new for new changed formula expression
-      this.parseExpression(new CellValue(row, column), newValue.substr(1));
+      const cellValue = new CellValue(row, column);
+
+      // copy over dependent values from old cell to new cell
+      const dependents = oldCellValue ? oldCellValue.getDependents() : [];
+      arrayEach(dependents, (dep) => cellValue.addDependent(dep));
+      this.parseExpression(cellValue, newValue.substr(1));
     }
 
     const deps = this.getCellDependencies(...this.t.toVisual(row, column));
@@ -190,7 +206,6 @@ class Sheet {
 
     if (isFormulaExpression(result)) {
       this.parseExpression(cellValue, result.substr(1));
-
     } else {
       cellValue.setValue(result);
       cellValue.setError(error);

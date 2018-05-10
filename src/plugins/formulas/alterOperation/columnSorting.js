@@ -22,7 +22,7 @@ export function prepare() {
 
   visualRows = new WeakMap();
 
-  arrayEach(matrix.data, (cell) => {
+  arrayEach(matrix.data.values(), (cell) => {
     visualRows.set(cell, dataProvider.t.toVisualRow(cell.row));
   });
 }
@@ -35,7 +35,7 @@ export function operate() {
 
   matrix.cellReferences.length = 0;
 
-  arrayEach(matrix.data, (cell) => {
+  arrayEach(matrix.data.values(), (cell) => {
     cell.setState(CellValue.STATE_OUT_OFF_DATE);
     cell.clearPrecedents();
     cell.clearDependents();

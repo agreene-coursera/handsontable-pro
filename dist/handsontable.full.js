@@ -21,7 +21,7 @@
  * UNINTERRUPTED OR ERROR FREE.
  * 
  * Version: 2.0.0
- * Release date: 11/04/2018 (built at 08/05/2018 16:05:14)
+ * Release date: 11/04/2018 (built at 10/05/2018 13:56:08)
  */
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
@@ -12334,13 +12334,21 @@ var CellValue = function (_BaseCell) {
     _classCallCheck(this, CellValue);
 
     /**
-     * List of precedents cells.
+     * List of precedent cells.
      *
      * @type {Array}
      */
     var _this = _possibleConstructorReturn(this, (CellValue.__proto__ || Object.getPrototypeOf(CellValue)).call(this, row, column));
 
     _this.precedents = [];
+
+    /**
+     * List of dependent cells.
+     *
+     * @type {Array}
+     */
+    _this.dependents = [];
+
     /**
      * Computed value.
      *
@@ -12536,6 +12544,18 @@ var CellValue = function (_BaseCell) {
     key: 'clearDependents',
     value: function clearDependents() {
       this.dependents.length = 0;
+    }
+
+    /**
+     * Get precedent cells.
+     *
+     * @returns {Array}
+     */
+
+  }, {
+    key: 'getPrecedents',
+    value: function getPrecedents() {
+      return this.precedents;
     }
 
     /**
@@ -57869,7 +57889,7 @@ Handsontable.DefaultSettings = _defaultSettings2.default;
 Handsontable.EventManager = _eventManager2.default;
 Handsontable._getListenersCounter = _eventManager.getListenersCounter; // For MemoryLeak tests
 
-Handsontable.buildDate = '08/05/2018 16:05:14';
+Handsontable.buildDate = '10/05/2018 13:56:08';
 Handsontable.packageName = 'handsontable-pro';
 Handsontable.version = '2.0.0';
 
@@ -97780,6 +97800,8 @@ var _localHooks2 = _interopRequireDefault(_localHooks);
 
 var _recordTranslator = __webpack_require__(54);
 
+var _object = __webpack_require__(1);
+
 var _value = __webpack_require__(46);
 
 var _value2 = _interopRequireDefault(_value);
@@ -97913,17 +97935,26 @@ var Sheet = function () {
       var _this2 = this;
 
       var cells = this.matrix.getOutOfDateCells();
+      var hasUncomputedFormulas = false;
 
       (0, _array.arrayEach)(cells, function (cellValue) {
-        var value = _this2.dataProvider.getSourceDataAtCell(cellValue.row, cellValue.column);
+        if (_this2.matrix.getCellPrecedentsUpToDate(cellValue)) {
+          var value = _this2.dataProvider.getSourceDataAtCell(cellValue.row, cellValue.column);
 
-        if ((0, _utils.isFormulaExpression)(value)) {
-          _this2.parseExpression(cellValue, value.substr(1));
+          if ((0, _utils.isFormulaExpression)(value)) {
+            _this2.parseExpression(cellValue, value.substr(1));
+          }
+        } else {
+          hasUncomputedFormulas = true;
         }
       });
 
-      this._state = STATE_UP_TO_DATE;
-      this.runLocalHooks('afterRecalculate', cells, 'optimized');
+      if (hasUncomputedFormulas) {
+        this.recalculateOptimized();
+      } else {
+        this._state = STATE_UP_TO_DATE;
+        this.runLocalHooks('afterRecalculate', cells, 'optimized');
+      }
     }
 
     /**
@@ -97989,12 +98020,20 @@ var Sheet = function () {
     value: function applyChanges(row, column, newValue) {
       // Remove formula description for old expression
       // TODO: Move this to recalculate()
+      var oldCellValue = this.matrix.getCellAt(row, column);
       this.matrix.remove({ row: row, column: column });
 
       // TODO: Move this to recalculate()
       if ((0, _utils.isFormulaExpression)(newValue)) {
         // ...and create new for new changed formula expression
-        this.parseExpression(new _value2.default(row, column), newValue.substr(1));
+        var cellValue = new _value2.default(row, column);
+
+        // copy over dependent values from old cell to new cell
+        var dependents = oldCellValue ? oldCellValue.getDependents() : [];
+        (0, _array.arrayEach)(dependents, function (dep) {
+          return cellValue.addDependent(dep);
+        });
+        this.parseExpression(cellValue, newValue.substr(1));
       }
 
       var deps = this.getCellDependencies.apply(this, _toConsumableArray(this.t.toVisual(row, column)));
@@ -98234,7 +98273,7 @@ var Sheet = function () {
   return Sheet;
 }();
 
-mixin(Sheet, _localHooks2.default);
+(0, _object.mixin)(Sheet, _localHooks2.default);
 
 exports.default = Sheet;
 
@@ -98316,6 +98355,8 @@ var _value2 = _interopRequireDefault(_value);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
+
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 /**
@@ -98345,9 +98386,9 @@ var Matrix = function () {
     /**
      * List of all cell values with theirs precedents.
      *
-     * @type {Array}
+     * @type {Map}
      */
-    this.data = [];
+    this.data = new Map();
     /**
      * List of all created and registered cell references.
      *
@@ -98368,17 +98409,7 @@ var Matrix = function () {
   _createClass(Matrix, [{
     key: 'getCellAt',
     value: function getCellAt(row, column) {
-      var result = null;
-
-      (0, _array.arrayEach)(this.data, function (cell) {
-        if (cell.row === row && cell.column === column) {
-          result = cell;
-
-          return false;
-        }
-      });
-
-      return result;
+      return this.data.get(row + ', ' + column) || null;
     }
 
     /**
@@ -98390,9 +98421,22 @@ var Matrix = function () {
   }, {
     key: 'getOutOfDateCells',
     value: function getOutOfDateCells() {
-      return (0, _array.arrayFilter)(this.data, function (cell) {
+      return (0, _array.arrayFilter)(this.data.values(), function (cell) {
         return cell.isState(_value2.default.STATE_OUT_OFF_DATE);
       });
+    }
+  }, {
+    key: 'getCellPrecedentsUpToDate',
+    value: function getCellPrecedentsUpToDate(cellValue) {
+      var _this = this;
+
+      return (0, _array.arrayFilter)(cellValue.getPrecedents(), function (_ref) {
+        var row = _ref.row,
+            column = _ref.column;
+
+        var cell = _this.getCellAt(row, column);
+        return cell && !cell.isState(_value2.default.STATE_UP_TO_DATE);
+      }).length !== 0;
     }
 
     /**
@@ -98404,10 +98448,11 @@ var Matrix = function () {
   }, {
     key: 'add',
     value: function add(cellValue) {
-      if (!(0, _array.arrayFilter)(this.data, function (cell) {
-        return cell.isEqual(cellValue);
-      }).length) {
-        this.data.push(cellValue);
+      var row = cellValue.row,
+          column = cellValue.column;
+
+      if (!this.getCellAt(row, column)) {
+        this.data.set(row + ', ' + column, cellValue);
       }
     }
 
@@ -98420,27 +98465,31 @@ var Matrix = function () {
   }, {
     key: 'remove',
     value: function remove(cellValue) {
+      var _this2 = this;
+
       var isArray = Array.isArray(cellValue);
-      var isEqual = function isEqual(cell, cellValue) {
-        var result = false;
-
-        if (isArray) {
-          (0, _array.arrayEach)(cellValue, function (value) {
-            if (cell.isEqual(value)) {
-              result = true;
-
-              return false;
-            }
-          });
-        } else {
-          result = cell.isEqual(cellValue);
+      if (isArray) {
+        (0, _array.arrayEach)(cellValue, function (_ref2) {
+          var row = _ref2.row,
+              column = _ref2.column;
+          return _this2.data.delete(row + ', ' + column);
+        });
+      } else {
+        this.data.delete(cellValue.row + ', ' + cellValue.column);
+      }
+    }
+  }, {
+    key: 'translateCells',
+    value: function translateCells(start, translate) {
+      this.data = (0, _array.arrayReduce)(this.data.values(), function (map, cell) {
+        if (cell.column >= start) {
+          cell.translateTo.apply(cell, _toConsumableArray(translate));
+          cell.setState(_value2.default.STATE_OUT_OFF_DATE);
         }
 
-        return result;
-      };
-      this.data = (0, _array.arrayFilter)(this.data, function (cell) {
-        return !isEqual(cell, cellValue);
-      });
+        map.set(cell.row + ', ' + cell.column, cell);
+        return map;
+      }, new Map());
     }
 
     /**
@@ -98451,18 +98500,16 @@ var Matrix = function () {
 
   }, {
     key: 'getDependencies',
-    value: function getDependencies(_ref) {
-      var _this = this;
+    value: function getDependencies(_ref3) {
+      var _this3 = this;
 
-      var row = _ref.row,
-          column = _ref.column;
+      var row = _ref3.row,
+          column = _ref3.column;
 
       /* eslint-disable arrow-body-style */
       var getDependencies = function getDependencies(cell) {
-        cell.getDependents().map(function (dep) {
-          return _this.data.find(function (cellValue) {
-            return cellValue.isEqual(dep);
-          });
+        return cell.getDependents().map(function (dep) {
+          return _this3.getCellAt(dep.row, dep.column);
         });
       };
 
@@ -98472,7 +98519,7 @@ var Matrix = function () {
         if (deps.length) {
           (0, _array.arrayEach)(deps, function (cellValue) {
             if (cellValue.hasDependents()) {
-              deps = deps.concat(getTotalDependencies(_this.t.toVisual(cellValue)));
+              deps = deps.concat(getTotalDependencies(_this3.t.toVisual(cellValue)));
             }
           });
         }
@@ -98509,11 +98556,11 @@ var Matrix = function () {
 
   }, {
     key: 'removeCellRefsAtRange',
-    value: function removeCellRefsAtRange(_ref2, _ref3) {
-      var startRow = _ref2.row,
-          startColumn = _ref2.column;
-      var endRow = _ref3.row,
-          endColumn = _ref3.column;
+    value: function removeCellRefsAtRange(_ref4, _ref5) {
+      var startRow = _ref4.row,
+          startColumn = _ref4.column;
+      var endRow = _ref5.row,
+          endColumn = _ref5.column;
 
       var removed = [];
 
@@ -98544,7 +98591,7 @@ var Matrix = function () {
   }, {
     key: 'reset',
     value: function reset() {
-      this.data.length = 0;
+      this.data = new Map();
       this.cellReferences.length = 0;
     }
   }]);
@@ -98777,7 +98824,7 @@ function prepare() {
 
   visualRows = new WeakMap();
 
-  (0, _array.arrayEach)(matrix.data, function (cell) {
+  (0, _array.arrayEach)(matrix.data.values(), function (cell) {
     visualRows.set(cell, dataProvider.t.toVisualRow(cell.row));
   });
 }
@@ -98792,7 +98839,7 @@ function operate() {
 
   matrix.cellReferences.length = 0;
 
-  (0, _array.arrayEach)(matrix.data, function (cell) {
+  (0, _array.arrayEach)(matrix.data.values(), function (cell) {
     cell.setState(_value2.default.STATE_OUT_OFF_DATE);
     cell.clearPrecedents();
     cell.clearDependents();
@@ -98871,15 +98918,11 @@ function operate(start, amount) {
     }
   });
 
-  (0, _array.arrayEach)(matrix.data, function (cell) {
+  matrix.translateCells(start, translate);
+
+  (0, _array.arrayEach)(matrix.data.values(), function (cell) {
     var origRow = cell.row,
         origColumn = cell.column;
-
-
-    if (cell.column >= start) {
-      cell.translateTo.apply(cell, translate);
-      cell.setState(_value2.default.STATE_OUT_OFF_DATE);
-    }
 
     if (modifyFormula) {
       var row = cell.row,
@@ -98976,15 +99019,11 @@ function operate(start, amount) {
     }
   });
 
-  (0, _array.arrayEach)(matrix.data, function (cell) {
+  matrix.translateCells(start, translate);
+
+  (0, _array.arrayEach)(matrix.data.values(), function (cell) {
     var origRow = cell.row,
         origColumn = cell.column;
-
-
-    if (cell.row >= start) {
-      cell.translateTo.apply(cell, translate);
-      cell.setState(_value2.default.STATE_OUT_OFF_DATE);
-    }
 
     if (modifyFormula) {
       var row = cell.row,
@@ -99083,7 +99122,7 @@ function operate(start, amount) {
   var removedCellRef = matrix.removeCellRefsAtRange({ column: start }, { column: start + indexOffset });
   var toRemove = [];
 
-  (0, _array.arrayEach)(matrix.data, function (cell) {
+  (0, _array.arrayEach)(matrix.data.values(), function (cell) {
     (0, _array.arrayEach)(removedCellRef, function (cellRef) {
       if (!cell.hasPrecedent(cellRef)) {
         return;
@@ -99110,15 +99149,12 @@ function operate(start, amount) {
     }
   });
 
-  (0, _array.arrayEach)(matrix.data, function (cell) {
+  matrix.translateCells(start, translate);
+
+  (0, _array.arrayEach)(matrix.data.values(), function (cell) {
     var origRow = cell.row,
         origColumn = cell.column;
 
-
-    if (cell.column >= start) {
-      cell.translateTo.apply(cell, translate);
-      cell.setState(_value2.default.STATE_OUT_OFF_DATE);
-    }
 
     if (modifyFormula) {
       var row = cell.row,
@@ -99240,7 +99276,7 @@ function operate(start, amount) {
   var removedCellRef = matrix.removeCellRefsAtRange({ row: start }, { row: start + indexOffset });
   var toRemove = [];
 
-  (0, _array.arrayEach)(matrix.data, function (cell) {
+  (0, _array.arrayEach)(matrix.data.values(), function (cell) {
     (0, _array.arrayEach)(removedCellRef, function (cellRef) {
       if (!cell.hasPrecedent(cellRef)) {
         return;
@@ -99267,15 +99303,12 @@ function operate(start, amount) {
     }
   });
 
-  (0, _array.arrayEach)(matrix.data, function (cell) {
+  matrix.translateCells(start, translate);
+
+  (0, _array.arrayEach)(matrix.data.values(), function (cell) {
     var origRow = cell.row,
         origColumn = cell.column;
 
-
-    if (cell.row >= start) {
-      cell.translateTo.apply(cell, translate);
-      cell.setState(_value2.default.STATE_OUT_OFF_DATE);
-    }
 
     if (modifyFormula) {
       var row = cell.row,

@@ -31,7 +31,7 @@ export function operate(start, amount, modifyFormula = true) {
   let removedCellRef = matrix.removeCellRefsAtRange({column: start}, {column: start + indexOffset});
   let toRemove = [];
 
-  arrayEach(matrix.data, (cell) => {
+  arrayEach(matrix.data.values(), (cell) => {
     arrayEach(removedCellRef, (cellRef) => {
       if (!cell.hasPrecedent(cellRef)) {
         return;
@@ -58,13 +58,10 @@ export function operate(start, amount, modifyFormula = true) {
     }
   });
 
-  arrayEach(matrix.data, (cell) => {
-    const {row: origRow, column: origColumn} = cell;
+  matrix.translateCells(start, translate);
 
-    if (cell.column >= start) {
-      cell.translateTo(...translate);
-      cell.setState(CellValue.STATE_OUT_OFF_DATE);
-    }
+  arrayEach(matrix.data.values(), (cell) => {
+    const {row: origRow, column: origColumn} = cell;
 
     if (modifyFormula) {
       const {row, column} = cell;
