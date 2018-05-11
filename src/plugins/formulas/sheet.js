@@ -125,7 +125,19 @@ class Sheet {
    * Recalculate whole table by building dependencies from scratch (slow recalculation).
    */
   recalculateFull() {
-    this.matrix.setCellsOutOfDate();
+    const cells = this.dataProvider.getSourceDataByRange();
+
+    this.matrix.reset();
+
+    arrayEach(cells, (rowData, row) => {
+      arrayEach(rowData, (value, column) => {
+        if (isFormulaExpression(value)) {
+          const cellValue = new CellValue(row, column);
+          cellValue.setState(CellValue.STATE_OUT_OFF_DATE);
+          this.matrix.add(cellValue);
+        }
+      });
+    });
     this.recalculateOptimized();
   }
 
