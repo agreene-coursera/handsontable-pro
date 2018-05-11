@@ -133,7 +133,7 @@ class Matrix {
       return Array.from(currentDeps);
     };
 
-    return getTotalDependencies(this.getCellAt(row, column));
+    return getDependencies(this.getCellAt(row, column));
   }
 
   /**
