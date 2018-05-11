@@ -247,7 +247,6 @@ class Sheet {
     }
 
     const precedentCellRef = new CellReference(row, column);
-
     const dependentCellRef = new CellReference(this._processingCell.row, this._processingCell.column);
 
     this.matrix.registerCellRef(precedentCellRef);

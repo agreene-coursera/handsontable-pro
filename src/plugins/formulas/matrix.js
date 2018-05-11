@@ -171,7 +171,7 @@ class Matrix {
    * @param {DependentContainer|Object} cellReference Cell reference object.
    */
   registerDependentContainer(dependentContainer) {
-    const { row, column } = cellValue;
+    const { row, column } = dependentContainer;
     if (!this.getDependentContainerAt(row, column)) {
       this.dependentContainers.set(`${row}, ${column}`, dependentContainer);
     }
