@@ -253,20 +253,24 @@ class Sheet {
     this.matrix.registerCellRef(dependentCellRef);
     this._processingCell.addPrecedent(precedentCellRef);
 
-    let dependentsContainer;
+    let dependentContainer;
     if (this.matrix.getDependentContainerAt(row.index, column.index)) {
-      dependentsContainer = this.matrix.getDependentContainerAt(row.index, column.index);
-      dependentsContainer.addDependent(dependentCellRef);
+      dependentContainer = this.matrix.getDependentContainerAt(row.index, column.index);
+      dependentContainer.addDependent(dependentCellRef);
     } else {
-      dependentsContainer = new DependentContainer(row, column);
-      dependentsContainer.addDependent(dependentCellRef);
-      this.matrix.registerDependentContainer(dependentsContainer);
+      dependentContainer = new DependentContainer(row, column);
+      dependentContainer.addDependent(dependentCellRef);
+      this.matrix.registerDependentContainer(dependentContainer);
     }
 
     const cellValue = this.dataProvider.getRawDataAtCell(row.index, column.index);
 
-    if (isFormulaError(cellValue) && precedentCellValue.hasError()) {
-      throw Error(cellValue);
+    if (isFormulaError(cellValue)) {
+      const computedCell = this.matrix.getCellAt(row.index, column.index);
+
+      if (computedCell && computedCell.hasError()) {
+        throw Error(cellData);
+      }
     }
 
     if (isFormulaExpression(cellValue)) {
@@ -309,18 +313,18 @@ class Sheet {
       this.matrix.registerCellRef(dependentCellRef);
       this._processingCell.addPrecedent(precedentCellRef);
 
-      let dependentsContainer;
-      if (this.matrix.getDependentContainerAt(row.index, column.index)) {
-        dependentsContainer = this.matrix.getDependentContainerAt(row.index, column.index);
-        dependentsContainer.addDependent(dependentCellRef);
+      let dependentContainer;
+      if (this.matrix.getDependentContainerAt(rowCellCoord, columnCellCoord)) {
+        dependentContainer = this.matrix.getDependentContainerAt(rowCellCoord, columnCellCoord);
+        dependentContainer.addDependent(dependentCellRef);
       } else {
-        dependentsContainer = new DependentContainer(row, column);
-        dependentsContainer.addDependent(dependentCellRef);
-        this.matrix.registerDependentContainer(dependentsContainer);
+        dependentContainer = new DependentContainer(rowCellCoord, columnCellCoord);
+        dependentContainer.addDependent(dependentCellRef);
+        this.matrix.registerDependentContainer(dependentContainer);
       }
 
       if (isFormulaError(cellData)) {
-        const computedCell = this.matrix.getCellAt(cell.row, cell.column);
+        const computedCell = this.matrix.getCellAt(rowCellCoord, columnCellCoord);
 
         if (computedCell && computedCell.hasError()) {
           throw Error(cellData);

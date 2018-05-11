@@ -21,7 +21,7 @@
  * UNINTERRUPTED OR ERROR FREE.
  * 
  * Version: 2.0.0
- * Release date: 11/04/2018 (built at 11/05/2018 13:24:11)
+ * Release date: 11/04/2018 (built at 11/05/2018 14:14:39)
  */
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
@@ -57799,7 +57799,7 @@ Handsontable.DefaultSettings = _defaultSettings2.default;
 Handsontable.EventManager = _eventManager2.default;
 Handsontable._getListenersCounter = _eventManager.getListenersCounter; // For MemoryLeak tests
 
-Handsontable.buildDate = '11/05/2018 13:24:11';
+Handsontable.buildDate = '11/05/2018 14:14:39';
 Handsontable.packageName = 'handsontable-pro';
 Handsontable.version = '2.0.0';
 
@@ -98034,20 +98034,24 @@ var Sheet = function () {
       this.matrix.registerCellRef(dependentCellRef);
       this._processingCell.addPrecedent(precedentCellRef);
 
-      var dependentsContainer = void 0;
+      var dependentContainer = void 0;
       if (this.matrix.getDependentContainerAt(row.index, column.index)) {
-        dependentsContainer = this.matrix.getDependentContainerAt(row.index, column.index);
-        dependentsContainer.addDependent(dependentCellRef);
+        dependentContainer = this.matrix.getDependentContainerAt(row.index, column.index);
+        dependentContainer.addDependent(dependentCellRef);
       } else {
-        dependentsContainer = new _dependentContainer2.default(row, column);
-        dependentsContainer.addDependent(dependentCellRef);
-        this.matrix.registerDependentContainer(dependentsContainer);
+        dependentContainer = new _dependentContainer2.default(row, column);
+        dependentContainer.addDependent(dependentCellRef);
+        this.matrix.registerDependentContainer(dependentContainer);
       }
 
       var cellValue = this.dataProvider.getRawDataAtCell(row.index, column.index);
 
-      if ((0, _hotFormulaParser.error)(cellValue) && precedentCellValue.hasError()) {
-        throw Error(cellValue);
+      if ((0, _hotFormulaParser.error)(cellValue)) {
+        var computedCell = this.matrix.getCellAt(row.index, column.index);
+
+        if (computedCell && computedCell.hasError()) {
+          throw Error(cellData);
+        }
       }
 
       if ((0, _utils.isFormulaExpression)(cellValue)) {
@@ -98104,18 +98108,18 @@ var Sheet = function () {
           _this4.matrix.registerCellRef(dependentCellRef);
           _this4._processingCell.addPrecedent(precedentCellRef);
 
-          var dependentsContainer = void 0;
-          if (_this4.matrix.getDependentContainerAt(row.index, column.index)) {
-            dependentsContainer = _this4.matrix.getDependentContainerAt(row.index, column.index);
-            dependentsContainer.addDependent(dependentCellRef);
+          var dependentContainer = void 0;
+          if (_this4.matrix.getDependentContainerAt(rowCellCoord, columnCellCoord)) {
+            dependentContainer = _this4.matrix.getDependentContainerAt(rowCellCoord, columnCellCoord);
+            dependentContainer.addDependent(dependentCellRef);
           } else {
-            dependentsContainer = new _dependentContainer2.default(row, column);
-            dependentsContainer.addDependent(dependentCellRef);
-            _this4.matrix.registerDependentContainer(dependentsContainer);
+            dependentContainer = new _dependentContainer2.default(rowCellCoord, columnCellCoord);
+            dependentContainer.addDependent(dependentCellRef);
+            _this4.matrix.registerDependentContainer(dependentContainer);
           }
 
           if ((0, _hotFormulaParser.error)(cellData)) {
-            var computedCell = _this4.matrix.getCellAt(cell.row, cell.column);
+            var computedCell = _this4.matrix.getCellAt(rowCellCoord, columnCellCoord);
 
             if (computedCell && computedCell.hasError()) {
               throw Error(cellData);
