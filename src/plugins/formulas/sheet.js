@@ -258,7 +258,7 @@ class Sheet {
       dependentsContainer = this.matrix.getDependentContainerAt(row.index, column.index);
       dependentsContainer.addDependent(dependentCellRef);
     } else {
-      dependentsContainer = new DependentContainer(row, col);
+      dependentsContainer = new DependentContainer(row, column);
       dependentsContainer.addDependent(dependentCellRef);
       this.matrix.registerDependentContainer(dependentsContainer);
     }
@@ -314,7 +314,7 @@ class Sheet {
         dependentsContainer = this.matrix.getDependentContainerAt(row.index, column.index);
         dependentsContainer.addDependent(dependentCellRef);
       } else {
-        dependentsContainer = new DependentContainer(row, col);
+        dependentsContainer = new DependentContainer(row, column);
         dependentsContainer.addDependent(dependentCellRef);
         this.matrix.registerDependentContainer(dependentsContainer);
       }

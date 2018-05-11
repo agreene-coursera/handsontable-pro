@@ -21,7 +21,7 @@
  * UNINTERRUPTED OR ERROR FREE.
  * 
  * Version: 2.0.0
- * Release date: 11/04/2018 (built at 11/05/2018 12:49:47)
+ * Release date: 11/04/2018 (built at 11/05/2018 13:09:26)
  */
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
@@ -57799,7 +57799,7 @@ Handsontable.DefaultSettings = _defaultSettings2.default;
 Handsontable.EventManager = _eventManager2.default;
 Handsontable._getListenersCounter = _eventManager.getListenersCounter; // For MemoryLeak tests
 
-Handsontable.buildDate = '11/05/2018 12:49:47';
+Handsontable.buildDate = '11/05/2018 13:09:26';
 Handsontable.packageName = 'handsontable-pro';
 Handsontable.version = '2.0.0';
 
@@ -98039,7 +98039,7 @@ var Sheet = function () {
         dependentsContainer = this.matrix.getDependentContainerAt(row.index, column.index);
         dependentsContainer.addDependent(dependentCellRef);
       } else {
-        dependentsContainer = new _dependentContainer2.default(row, col);
+        dependentsContainer = new _dependentContainer2.default(row, column);
         dependentsContainer.addDependent(dependentCellRef);
         this.matrix.registerDependentContainer(dependentsContainer);
       }
@@ -98109,7 +98109,7 @@ var Sheet = function () {
             dependentsContainer = _this4.matrix.getDependentContainerAt(row.index, column.index);
             dependentsContainer.addDependent(dependentCellRef);
           } else {
-            dependentsContainer = new _dependentContainer2.default(row, col);
+            dependentsContainer = new _dependentContainer2.default(row, column);
             dependentsContainer.addDependent(dependentCellRef);
             _this4.matrix.registerDependentContainer(dependentsContainer);
           }
