@@ -5,6 +5,7 @@ import {getTranslator} from 'handsontable/utils/recordTranslator';
 import {mixin} from 'handsontable/helpers/object';
 import CellValue from './cell/value';
 import CellReference from './cell/reference';
+import DependentContainer from './cell/dependentContainer';
 import {isFormulaExpression, toUpperCaseFormula} from './utils';
 import Matrix from './matrix';
 import AlterManager from './alterManager';
@@ -96,7 +97,7 @@ class Sheet {
   /**
    * Recalculate sheet using optimized methods (fast recalculation).
    */
-  recalculateOptimized(depth = 5) {
+  recalculateOptimized() {
     const cells = this.matrix.getOutOfDateCells();
     let hasUncomputedFormulas = false;
 
@@ -112,8 +113,8 @@ class Sheet {
       }
     });
 
-    if (hasUncomputedFormulas && depth > 0) {
-      this.recalculateOptimized(depth - 1);
+    if (hasUncomputedFormulas) {
+      this.recalculateOptimized();
     } else {
       this._state = STATE_UP_TO_DATE;
       this.runLocalHooks('afterRecalculate', cells, 'optimized');
@@ -169,20 +170,13 @@ class Sheet {
   applyChanges(row, column, newValue) {
     // Remove formula description for old expression
     // TODO: Move this to recalculate()
-    const oldCellValue = this.matrix.getCellAt(row, column);
-    const dependents = oldCellValue ? oldCellValue.getDependents() : [];
     this.matrix.remove({row, column});
-    // ...and create new for new changed formula expression
-    const cellValue = new CellValue(row, column);
 
-    // copy over dependent values from old cell to new cell
-    arrayEach(dependents, (dep) => cellValue.addDependent(dep));
+    const cellValue = new CellValue(row, column);
 
     // TODO: Move this to recalculate()
     if (isFormulaExpression(newValue)) {
       this.parseExpression(cellValue, newValue.substr(1));
-    } else {
-      this.matrix.add(cellValue);
     }
 
     const deps = this.getCellDependencies(...this.t.toVisual(row, column));
@@ -260,14 +254,14 @@ class Sheet {
     this.matrix.registerCellRef(dependentCellRef);
     this._processingCell.addPrecedent(precedentCellRef);
 
-    let precedentCellValue;
-    if (this.matrix.getCellAt(row.index, column.index)) {
-      precedentCellValue = this.matrix.getCellAt(row.index, column.index);
-      precedentCellValue.addDependent(dependentCellRef);
+    let dependentsContainer;
+    if (this.matrix.getDependentContainerAt(row.index, column.index)) {
+      dependentsContainer = this.matrix.getDependentContainerAt(row.index, column.index);
+      dependentsContainer.addDependent(dependentCellRef);
     } else {
-      precedentCellValue = new CellValue(row, col);
-      precedentCellValue.addDependent(dependentCellRef);
-      this.matrix.add(precedentCellValue);
+      dependentsContainer = new DependentContainer(row, col);
+      dependentsContainer.addDependent(dependentCellRef);
+      this.matrix.registerDependentContainer(dependentsContainer);
     }
 
     const cellValue = this.dataProvider.getRawDataAtCell(row.index, column.index);
@@ -316,14 +310,14 @@ class Sheet {
       this.matrix.registerCellRef(dependentCellRef);
       this._processingCell.addPrecedent(precedentCellRef);
 
-      let precedentCellValue;
-      if (this.matrix.getCellAt(rowCellCoord, columnCellCoord)) {
-        precedentCellValue = this.matrix.getCellAt(rowCellCoord, columnCellCoord);
-        precedentCellValue.addDependent(dependentCellRef);
+      let dependentsContainer;
+      if (this.matrix.getDependentContainerAt(row.index, column.index)) {
+        dependentsContainer = this.matrix.getDependentContainerAt(row.index, column.index);
+        dependentsContainer.addDependent(dependentCellRef);
       } else {
-        precedentCellValue = new CellValue(rowCellCoord, columnCellCoord);
-        precedentCellValue.addDependent(dependentCellRef);
-        this.matrix.add(precedentCellValue);
+        dependentsContainer = new DependentContainer(row, col);
+        dependentsContainer.addDependent(dependentCellRef);
+        this.matrix.registerDependentContainer(dependentsContainer);
       }
 
       if (isFormulaError(cellData)) {

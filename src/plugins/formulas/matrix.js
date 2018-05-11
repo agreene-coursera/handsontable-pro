@@ -35,6 +35,13 @@ class Matrix {
      * @type {Array}
      */
     this.cellReferences = [];
+
+    /**
+     * List of all created and registered dependent containers.
+     *
+     * @type {Map}
+     */
+    this.dependentContainers = new Map();
   }
 
   /**
@@ -46,6 +53,17 @@ class Matrix {
    */
   getCellAt(row, column) {
     return this.data.get(`${row}, ${column}`) || null;
+  }
+
+  /**
+   * Get dependent container at given row and column index.
+   *
+   * @param {Number} row Physical row index.
+   * @param {Number} column Physical column index.
+   * @returns {DependentContainer|null} Returns DependentContainer instance or `null` if cell not found.
+   */
+  getDependentContainerAt(row, column) {
+    return this.dependentContainers.get(`${row}, ${column}`) || null;
   }
 
   /**
@@ -85,15 +103,35 @@ class Matrix {
   remove(cellValue) {
     const isArray = Array.isArray(cellValue);
     if (isArray) {
-      arrayEach(cellValue, ({row, column}) => this.data.delete(`${row}, ${column}`));
+      arrayEach(cellValue, ({row, column}) => {
+        this.data.delete(`${row}, ${column}`);
+      });
     } else {
       this.data.delete(`${cellValue.row}, ${cellValue.column}`);
     }
   }
 
+  /**
+   * Creates new maps for cellValues and dependentContainers that correspond to new locations
+   *
+   * @param {number} locatio where the change starts
+   */
   translateCells(start, translate) {
+    // create new map for cellValues at new location
+    const axis = translate[0] > 0 ? 'row' : 'col';
     this.data = arrayReduce(this.data.values(), (map, cell) => {
-      if (cell.column >= start) {
+      if ((axis === 'row' && cell.row >= start) || (axis === 'col' && cell.column >= start)) {
+        cell.translateTo(...translate);
+        cell.setState(CellValue.STATE_OUT_OFF_DATE);
+      }
+
+      map.set(`${cell.row}, ${cell.column}`, cell);
+      return map;
+    }, new Map());
+
+    // create new map for dependentContainers at new location
+    this.dependentContainers = arrayReduce(this.dependentContainers.values(), (map, cell) => {
+      if ((axis === 'row' && cell.row >= start) || (axis === 'col' && cell.column >= start)) {
         cell.translateTo(...translate);
         cell.setState(CellValue.STATE_OUT_OFF_DATE);
       }
@@ -109,31 +147,11 @@ class Matrix {
    * @param {Object} cellCoord Visual cell coordinates object.
    */
   getDependencies({ row, column }) {
-    /* eslint-disable arrow-body-style */
-    const getDependencies = (cell) => {
-      return cell ? cell.getDependents().map((dep) => this.getCellAt(dep.row, dep.column)).filter((dep) => !!dep) : [];
-    };
-
-    const getTotalDependencies = (cell, currentDeps = new Set()) => {
-      let deps = getDependencies(cell);
-
-      if (deps.length) {
-        arrayEach(deps, (cellValue) => {
-          const depVisualCoords = this.t.toVisual(cellValue);
-          const depCellValue = this.getCellAt(depVisualCoords.row, depVisualCoords.column);
-          if (!currentDeps.has(depCellValue)) {
-            currentDeps.add(depCellValue);
-            if (depCellValue.hasDependents()) {
-              arrayEach(getTotalDependencies(depCellValue, currentDeps), (newDep) => currentDeps.add(newDep));
-            }
-          }
-        });
-      }
-
-      return Array.from(currentDeps);
-    };
-
-    return getDependencies(this.getCellAt(row, column));
+    const container = this.getDependentContainerAt(row, column);
+    return container ? container.getDependents().map((dep) => {
+      const visualCoords = this.t.toVisual(dep.row, dep.column);
+      return this.getCellAt(visualCoords.row, visualCoords.column);
+    }).filter((dep) => !!dep) : [];
   }
 
   /**
@@ -144,6 +162,18 @@ class Matrix {
   registerCellRef(cellReference) {
     if (!arrayFilter(this.cellReferences, (cell) => cell.isEqual(cellReference)).length) {
       this.cellReferences.push(cellReference);
+    }
+  }
+
+  /**
+   * Register dependent container
+   *
+   * @param {DependentContainer|Object} cellReference Cell reference object.
+   */
+  registerDependentContainer(dependentContainer) {
+    const { row, column } = cellValue;
+    if (!this.getDependentContainerAt(row, column)) {
+      this.dependentContainers.set(`${row}, ${column}`, dependentContainer);
     }
   }
 
@@ -163,6 +193,7 @@ class Matrix {
     this.cellReferences = arrayFilter(this.cellReferences, (cell) => {
       if (rowMatch(cell) && colMatch(cell)) {
         removed.push(cell);
+        this.dependentContainers.delete(`${cell.row}, ${cell.column}`);
 
         return false;
       }

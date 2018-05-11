@@ -36,11 +36,15 @@ export function operate() {
   matrix.cellReferences.length = 0;
 
   arrayEach(matrix.data.values(), (cell) => {
+    const {row, column} = cell;
     cell.setState(CellValue.STATE_OUT_OFF_DATE);
     cell.clearPrecedents();
-    cell.clearDependents();
+    const dependentContainer = matrix.getDependentContainerAt(cell.row, cell.col);
+    if (dependentContainer) {
+      dependentContainer.clearDependents();
+    }
 
-    const {row, column} = cell;
+
     const value = dataProvider.getSourceDataAtCell(row, column);
 
     if (isFormulaExpression(value)) {

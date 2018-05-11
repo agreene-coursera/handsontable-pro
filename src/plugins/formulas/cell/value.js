@@ -54,13 +54,6 @@ class CellValue extends BaseCell {
     this.precedents = [];
 
     /**
-     * List of dependent cells.
-     *
-     * @type {Array}
-     */
-    this.dependents = [];
-
-    /**
      * Computed value.
      *
      * @type {*}
@@ -161,20 +154,6 @@ class CellValue extends BaseCell {
   }
 
   /**
-   * Add dependent cell to the collection.
-   *
-   * @param {CellReference} cellReference Cell reference object.
-   */
-  addDependent(cellReference) {
-    if (this.isEqual(cellReference)) {
-      throw Error(ERROR_REF);
-    }
-    if (!this.hasDependent(cellReference)) {
-      this.dependents.push(cellReference);
-    }
-  }
-
-  /**
    * Remove precedent cell from the collection.
    *
    * @param {CellReference} cellReference Cell reference object.
@@ -187,29 +166,10 @@ class CellValue extends BaseCell {
   }
 
   /**
-   * Remove dependent cell from the collection.
-   *
-   * @param {CellReference} cellReference Cell reference object.
-   */
-  removeDependent(cellReference) {
-    if (this.isEqual(cellReference)) {
-      throw Error(ERROR_REF);
-    }
-    this.precedents = arrayFilter(this.dependents, (cell) => !cell.isEqual(cellReference));
-  }
-
-  /**
    * Clear all precedent cells.
    */
   clearPrecedents() {
     this.precedents.length = 0;
-  }
-
-  /**
-   * Clear all dependent cells.
-   */
-  clearDependents() {
-    this.dependents.length = 0;
   }
 
   /**
@@ -222,30 +182,12 @@ class CellValue extends BaseCell {
   }
 
   /**
-   * Get dependent cells.
-   *
-   * @returns {Array}
-   */
-  getDependents() {
-    return this.dependents;
-  }
-
-  /**
    * Check if cell value has precedents cells.
    *
    * @returns {Boolean}
    */
   hasPrecedents() {
     return this.precedents.length > 0;
-  }
-
-  /**
-   * Check if cell value has dependent cells.
-   *
-   * @returns {Boolean}
-   */
-  hasDependents() {
-    return this.dependents.length > 0;
   }
 
   /**
@@ -256,17 +198,6 @@ class CellValue extends BaseCell {
    */
   hasPrecedent(cellReference) {
     return arrayFilter(this.precedents, (cell) => cell.isEqual(cellReference)).length > 0;
-  }
-
-  /**
-   * Check if cell reference is dependent on this cell.
-   *
-   * @param {CellReference} cellReference Cell reference object.
-   * @returns {Boolean}
-   */
-
-  hasDependent(cellReference) {
-    return arrayFilter(this.dependents, (cell) => cell.isEqual(cellReference)).length > 0;
   }
 }
 
