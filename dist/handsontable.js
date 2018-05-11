@@ -21,7 +21,7 @@
  * UNINTERRUPTED OR ERROR FREE.
  * 
  * Version: 2.0.0
- * Release date: 11/04/2018 (built at 10/05/2018 18:22:33)
+ * Release date: 11/04/2018 (built at 11/05/2018 10:25:40)
  */
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
@@ -34131,7 +34131,7 @@ Handsontable.DefaultSettings = _defaultSettings2.default;
 Handsontable.EventManager = _eventManager2.default;
 Handsontable._getListenersCounter = _eventManager.getListenersCounter; // For MemoryLeak tests
 
-Handsontable.buildDate = '10/05/2018 18:22:33';
+Handsontable.buildDate = '11/05/2018 10:25:40';
 Handsontable.packageName = 'handsontable-pro';
 Handsontable.version = '2.0.0';
 
@@ -68550,7 +68550,7 @@ var Matrix = function () {
         return Array.from(currentDeps);
       };
 
-      return getTotalDependencies(this.getCellAt(row, column));
+      return getDependencies(this.getCellAt(row, column));
     }
 
     /**
