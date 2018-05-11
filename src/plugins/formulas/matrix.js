@@ -149,7 +149,7 @@ class Matrix {
     const container = this.getDependentContainerAt(row, column);
     return container ? container.getDependents().map((dep) => {
       const visualCoords = this.t.toVisual(dep.row, dep.column);
-      return this.getCellAt(visualCoords.row, visualCoords.column);
+      return this.getCellAt(...visualCoords);
     }).filter((dep) => !!dep) : [];
   }
 
