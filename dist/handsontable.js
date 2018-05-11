@@ -21,7 +21,7 @@
  * UNINTERRUPTED OR ERROR FREE.
  * 
  * Version: 2.0.0
- * Release date: 11/04/2018 (built at 11/05/2018 14:28:56)
+ * Release date: 11/04/2018 (built at 11/05/2018 15:16:41)
  */
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
@@ -34041,7 +34041,7 @@ Handsontable.DefaultSettings = _defaultSettings2.default;
 Handsontable.EventManager = _eventManager2.default;
 Handsontable._getListenersCounter = _eventManager.getListenersCounter; // For MemoryLeak tests
 
-Handsontable.buildDate = '11/05/2018 14:28:56';
+Handsontable.buildDate = '11/05/2018 15:16:41';
 Handsontable.packageName = 'handsontable-pro';
 Handsontable.version = '2.0.0';
 
@@ -67886,21 +67886,8 @@ var Sheet = function () {
   }, {
     key: 'recalculateFull',
     value: function recalculateFull() {
-      var _this3 = this;
-
-      var cells = this.dataProvider.getSourceDataByRange();
-
-      (0, _array.arrayEach)(cells, function (rowData, row) {
-        (0, _array.arrayEach)(rowData, function (value, column) {
-          if ((0, _utils.isFormulaExpression)(value)) {
-            var cellValue = _this3.matrix.getCellAt(row, column) || new _value2.default(row, column);
-            _this3.parseExpression(cellValue, value.substr(1));
-          }
-        });
-      });
-
-      this._state = STATE_UP_TO_DATE;
-      this.runLocalHooks('afterRecalculate', cells, 'full');
+      this.matrix.setCellsOutOfDate();
+      this.recalculateOptimized();
     }
 
     /**
@@ -68092,7 +68079,7 @@ var Sheet = function () {
       var startRow = _ref2.row,
           startColumn = _ref2.column;
 
-      var _this4 = this;
+      var _this3 = this;
 
       var endRow = _ref3.row,
           endColumn = _ref3.column;
@@ -68104,30 +68091,30 @@ var Sheet = function () {
           var rowCellCoord = startRow.index + rowIndex;
           var columnCellCoord = startColumn.index + columnIndex;
 
-          if (!_this4.dataProvider.isInDataRange(rowCellCoord, columnCellCoord)) {
+          if (!_this3.dataProvider.isInDataRange(rowCellCoord, columnCellCoord)) {
             throw Error(_hotFormulaParser.ERROR_REF);
           }
 
           var precedentCellRef = new _reference2.default(rowCellCoord, columnCellCoord);
 
-          var dependentCellRef = new _reference2.default(_this4._processingCell.row, _this4._processingCell.column);
+          var dependentCellRef = new _reference2.default(_this3._processingCell.row, _this3._processingCell.column);
 
-          _this4.matrix.registerCellRef(precedentCellRef);
-          _this4.matrix.registerCellRef(dependentCellRef);
-          _this4._processingCell.addPrecedent(precedentCellRef);
+          _this3.matrix.registerCellRef(precedentCellRef);
+          _this3.matrix.registerCellRef(dependentCellRef);
+          _this3._processingCell.addPrecedent(precedentCellRef);
 
           var dependentContainer = void 0;
-          if (_this4.matrix.getDependentContainerAt(rowCellCoord, columnCellCoord)) {
-            dependentContainer = _this4.matrix.getDependentContainerAt(rowCellCoord, columnCellCoord);
+          if (_this3.matrix.getDependentContainerAt(rowCellCoord, columnCellCoord)) {
+            dependentContainer = _this3.matrix.getDependentContainerAt(rowCellCoord, columnCellCoord);
             dependentContainer.addDependent(dependentCellRef);
           } else {
             dependentContainer = new _dependentContainer2.default(rowCellCoord, columnCellCoord);
             dependentContainer.addDependent(dependentCellRef);
-            _this4.matrix.registerDependentContainer(dependentContainer);
+            _this3.matrix.registerDependentContainer(dependentContainer);
           }
 
           if ((0, _hotFormulaParser.error)(cellData)) {
-            var computedCell = _this4.matrix.getCellAt(rowCellCoord, columnCellCoord);
+            var computedCell = _this3.matrix.getCellAt(rowCellCoord, columnCellCoord);
 
             if (computedCell && computedCell.hasError()) {
               throw Error(cellData);
@@ -68135,7 +68122,7 @@ var Sheet = function () {
           }
 
           if ((0, _utils.isFormulaExpression)(cellData)) {
-            var _parser$parse3 = _this4.parser.parse(cellData.substr(1)),
+            var _parser$parse3 = _this3.parser.parse(cellData.substr(1)),
                 error = _parser$parse3.error,
                 result = _parser$parse3.result;
 
@@ -68503,6 +68490,20 @@ var Matrix = function () {
     value: function getOutOfDateCells() {
       return (0, _array.arrayFilter)(this.data.values(), function (cell) {
         return cell.isState(_value2.default.STATE_OUT_OFF_DATE);
+      });
+    }
+
+    /**
+     * Get all out of date cells.
+     *
+     * @returns {Array}
+     */
+
+  }, {
+    key: 'setCellsOutOfDate',
+    value: function setCellsOutOfDate() {
+      (0, _array.arrayEach)(this.data.values(), function (cell) {
+        return cell.setState(_value2.default.STATE_OUT_OFF_DATE);
       });
     }
   }, {

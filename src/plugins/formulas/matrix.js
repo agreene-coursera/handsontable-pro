@@ -75,6 +75,15 @@ class Matrix {
     return arrayFilter(this.data.values(), (cell) => cell.isState(CellValue.STATE_OUT_OFF_DATE));
   }
 
+  /**
+   * Get all out of date cells.
+   *
+   * @returns {Array}
+   */
+  setCellsOutOfDate() {
+    arrayEach(this.data.values(), (cell) => cell.setState(CellValue.STATE_OUT_OFF_DATE));
+  }
+
   getCellPrecedentsUpToDate(cellValue) {
     return arrayFilter(cellValue.getPrecedents(), ({row, column}) => {
       const cell = this.getCellAt(row, column);
