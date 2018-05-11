@@ -133,7 +133,6 @@ class Matrix {
     this.dependentContainers = arrayReduce(this.dependentContainers.values(), (map, cell) => {
       if ((axis === 'row' && cell.row >= start) || (axis === 'col' && cell.column >= start)) {
         cell.translateTo(...translate);
-        cell.setState(CellValue.STATE_OUT_OFF_DATE);
       }
 
       map.set(`${cell.row}, ${cell.column}`, cell);
