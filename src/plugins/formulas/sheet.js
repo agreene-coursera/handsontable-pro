@@ -170,23 +170,25 @@ class Sheet {
     // Remove formula description for old expression
     // TODO: Move this to recalculate()
     const oldCellValue = this.matrix.getCellAt(row, column);
+    const dependents = oldCellValue ? oldCellValue.getDependents() : [];
     this.matrix.remove({row, column});
+    // ...and create new for new changed formula expression
+    const cellValue = new CellValue(row, column);
+
+    // copy over dependent values from old cell to new cell
+    arrayEach(dependents, (dep) => cellValue.addDependent(dep));
 
     // TODO: Move this to recalculate()
     if (isFormulaExpression(newValue)) {
-      // ...and create new for new changed formula expression
-      const cellValue = new CellValue(row, column);
-
-      // copy over dependent values from old cell to new cell
-      const dependents = oldCellValue ? oldCellValue.getDependents() : [];
-      arrayEach(dependents, (dep) => cellValue.addDependent(dep));
       this.parseExpression(cellValue, newValue.substr(1));
+    } else {
+      this.matrix.add(cellValue);
     }
 
     const deps = this.getCellDependencies(...this.t.toVisual(row, column));
 
-    arrayEach(deps, (cellValue) => {
-      cellValue.setState(CellValue.STATE_OUT_OFF_DATE);
+    arrayEach(deps, (dep) => {
+      dep.setState(CellValue.STATE_OUT_OFF_DATE);
     });
 
     this._state = STATE_NEED_REBUILD;

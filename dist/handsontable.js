@@ -21,7 +21,7 @@
  * UNINTERRUPTED OR ERROR FREE.
  * 
  * Version: 2.0.0
- * Release date: 11/04/2018 (built at 10/05/2018 16:42:46)
+ * Release date: 11/04/2018 (built at 10/05/2018 17:44:49)
  */
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
@@ -34131,7 +34131,7 @@ Handsontable.DefaultSettings = _defaultSettings2.default;
 Handsontable.EventManager = _eventManager2.default;
 Handsontable._getListenersCounter = _eventManager.getListenersCounter; // For MemoryLeak tests
 
-Handsontable.buildDate = '10/05/2018 16:42:46';
+Handsontable.buildDate = '10/05/2018 17:44:49';
 Handsontable.packageName = 'handsontable-pro';
 Handsontable.version = '2.0.0';
 
@@ -68031,25 +68031,27 @@ var Sheet = function () {
       // Remove formula description for old expression
       // TODO: Move this to recalculate()
       var oldCellValue = this.matrix.getCellAt(row, column);
+      var dependents = oldCellValue ? oldCellValue.getDependents() : [];
       this.matrix.remove({ row: row, column: column });
+      // ...and create new for new changed formula expression
+      var cellValue = new _value2.default(row, column);
+
+      // copy over dependent values from old cell to new cell
+      (0, _array.arrayEach)(dependents, function (dep) {
+        return cellValue.addDependent(dep);
+      });
 
       // TODO: Move this to recalculate()
       if ((0, _utils.isFormulaExpression)(newValue)) {
-        // ...and create new for new changed formula expression
-        var cellValue = new _value2.default(row, column);
-
-        // copy over dependent values from old cell to new cell
-        var dependents = oldCellValue ? oldCellValue.getDependents() : [];
-        (0, _array.arrayEach)(dependents, function (dep) {
-          return cellValue.addDependent(dep);
-        });
         this.parseExpression(cellValue, newValue.substr(1));
+      } else {
+        this.matrix.add(cellValue);
       }
 
       var deps = this.getCellDependencies.apply(this, _toConsumableArray(this.t.toVisual(row, column)));
 
-      (0, _array.arrayEach)(deps, function (cellValue) {
-        cellValue.setState(_value2.default.STATE_OUT_OFF_DATE);
+      (0, _array.arrayEach)(deps, function (dep) {
+        dep.setState(_value2.default.STATE_OUT_OFF_DATE);
       });
 
       this._state = STATE_NEED_REBUILD;
