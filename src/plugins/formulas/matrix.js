@@ -114,20 +114,23 @@ class Matrix {
       return cell ? cell.getDependents().map((dep) => this.getCellAt(dep.row, dep.column)).filter((dep) => !!dep) : [];
     };
 
-    const getTotalDependencies = (cell) => {
+    const getTotalDependencies = (cell, currentDeps = new Set()) => {
       let deps = getDependencies(cell);
 
       if (deps.length) {
         arrayEach(deps, (cellValue) => {
-          if (cellValue.hasDependents()) {
-            const depVisualCoords = this.t.toVisual(cellValue);
-            const depCellValue = this.getCellAt(depVisualCoords.row, depVisualCoords.column);
-            deps = deps.concat(getTotalDependencies(depCellValue));
+          const depVisualCoords = this.t.toVisual(cellValue);
+          const depCellValue = this.getCellAt(depVisualCoords.row, depVisualCoords.column);
+          if (!currentDeps.has(depCellValue)) {
+            currentDeps.add(depCellValue);
+            if (depCellValue.hasDependents()) {
+              arrayEach(getTotalDependencies(depCellValue, currentDeps), (newDep) => currentDeps.add(newDep));
+            }
           }
         });
       }
 
-      return deps;
+      return Array.from(currentDeps);
     };
 
     return getTotalDependencies(this.getCellAt(row, column));

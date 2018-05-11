@@ -21,7 +21,7 @@
  * UNINTERRUPTED OR ERROR FREE.
  * 
  * Version: 2.0.0
- * Release date: 11/04/2018 (built at 10/05/2018 17:44:49)
+ * Release date: 11/04/2018 (built at 10/05/2018 18:22:33)
  */
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
@@ -57889,7 +57889,7 @@ Handsontable.DefaultSettings = _defaultSettings2.default;
 Handsontable.EventManager = _eventManager2.default;
 Handsontable._getListenersCounter = _eventManager.getListenersCounter; // For MemoryLeak tests
 
-Handsontable.buildDate = '10/05/2018 17:44:49';
+Handsontable.buildDate = '10/05/2018 18:22:33';
 Handsontable.packageName = 'handsontable-pro';
 Handsontable.version = '2.0.0';
 
@@ -98520,19 +98520,26 @@ var Matrix = function () {
       };
 
       var getTotalDependencies = function getTotalDependencies(cell) {
+        var currentDeps = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : new Set();
+
         var deps = getDependencies(cell);
 
         if (deps.length) {
           (0, _array.arrayEach)(deps, function (cellValue) {
-            if (cellValue.hasDependents()) {
-              var depVisualCoords = _this3.t.toVisual(cellValue);
-              var depCellValue = _this3.getCellAt(depVisualCoords.row, depVisualCoords.column);
-              deps = deps.concat(getTotalDependencies(depCellValue));
+            var depVisualCoords = _this3.t.toVisual(cellValue);
+            var depCellValue = _this3.getCellAt(depVisualCoords.row, depVisualCoords.column);
+            if (!currentDeps.has(depCellValue)) {
+              currentDeps.add(depCellValue);
+              if (depCellValue.hasDependents()) {
+                (0, _array.arrayEach)(getTotalDependencies(depCellValue, currentDeps), function (newDep) {
+                  return currentDeps.add(newDep);
+                });
+              }
             }
           });
         }
 
-        return deps;
+        return Array.from(currentDeps);
       };
 
       return getTotalDependencies(this.getCellAt(row, column));
