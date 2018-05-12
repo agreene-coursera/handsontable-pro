@@ -21,7 +21,7 @@
  * UNINTERRUPTED OR ERROR FREE.
  * 
  * Version: 2.0.0
- * Release date: 11/04/2018 (built at 11/05/2018 15:45:39)
+ * Release date: 11/04/2018 (built at 11/05/2018 17:19:56)
  */
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
@@ -57799,7 +57799,7 @@ Handsontable.DefaultSettings = _defaultSettings2.default;
 Handsontable.EventManager = _eventManager2.default;
 Handsontable._getListenersCounter = _eventManager.getListenersCounter; // For MemoryLeak tests
 
-Handsontable.buildDate = '11/05/2018 15:45:39';
+Handsontable.buildDate = '11/05/2018 17:19:56';
 Handsontable.packageName = 'handsontable-pro';
 Handsontable.version = '2.0.0';
 
@@ -97888,8 +97888,8 @@ var Sheet = function () {
         (0, _array.arrayEach)(rowData, function (value, column) {
           if ((0, _utils.isFormulaExpression)(value)) {
             var cellValue = new _value2.default(row, column);
+            _this3.parseExpression(cellValue, value.substr(1));
             cellValue.setState(_value2.default.STATE_OUT_OFF_DATE);
-            _this3.matrix.add(cellValue);
           }
         });
       });
@@ -98417,8 +98417,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
  *
  * CellValue is an object which represents a formula expression. It contains a calculated value of that formula,
  * an error if applied and cell references. Cell references are CellReference object instances which represent a cell
- * in a spreadsheet. One CellReference can be assigned to multiple CellValues as a precedent cell. Each cell
- * modification triggers a search through CellValues that are dependent of the CellReference. After
+ * in a spreadsheet. Intercell dependencies are tracked in DependentContainers which represent. Each DependentContainer can contain one or more CellReference cell
+ * which denotes which cells are dependent on that cell. Each cell modification triggers a search through that cells dependentContainer to find which CellValues depend on that cell. After
  * the match, the cells are marked as 'out of date'. In the next render cycle, all CellValues marked with
  * that state are recalculated.
  *
@@ -98436,7 +98436,7 @@ var Matrix = function () {
      */
     this.t = recordTranslator;
     /**
-     * List of all cell values with theirs precedents.
+     * List of all cell values
      *
      * @type {Map}
      */
@@ -98583,6 +98583,13 @@ var Matrix = function () {
         map.set(cell.row + ', ' + cell.column, cell);
         return map;
       }, new Map());
+
+      // translate all cell references
+      (0, _array.arrayEach)(this.cellReferences, function (cell) {
+        if (axis === 'row' && cell.row >= start || axis === 'col' && cell.column >= start) {
+          cell.translateTo.apply(cell, _toConsumableArray(translate));
+        }
+      });
     }
 
     /**
@@ -98652,8 +98659,6 @@ var Matrix = function () {
   }, {
     key: 'removeCellRefsAtRange',
     value: function removeCellRefsAtRange(_ref4, _ref5) {
-      var _this4 = this;
-
       var startRow = _ref4.row,
           startColumn = _ref4.column;
       var endRow = _ref5.row,
@@ -98671,8 +98676,6 @@ var Matrix = function () {
       this.cellReferences = (0, _array.arrayFilter)(this.cellReferences, function (cell) {
         if (rowMatch(cell) && colMatch(cell)) {
           removed.push(cell);
-          _this4.dependentContainers.delete(cell.row + ', ' + cell.column);
-
           return false;
         }
 
@@ -98680,6 +98683,46 @@ var Matrix = function () {
       });
 
       return removed;
+    }
+
+    /**
+     * Remove dependent Containers from the collection.
+     *
+     * @param {Object} start Start visual coordinate.
+     * @param {Object} end End visual coordinate.
+     * @returns {Array} Returns removed cell references.
+     */
+
+  }, {
+    key: 'removeDependentContainersAtRange',
+    value: function removeDependentContainersAtRange(_ref6, _ref7) {
+      var startRow = _ref6.row,
+          startColumn = _ref6.column;
+      var endRow = _ref7.row,
+          endColumn = _ref7.column;
+
+      var rowMatch = function rowMatch(cell) {
+        return startRow === void 0 ? true : cell.row >= startRow && cell.row <= endRow;
+      };
+      var colMatch = function colMatch(cell) {
+        return startColumn === void 0 ? true : cell.column >= startColumn && cell.column <= endColumn;
+      };
+
+      var split = (0, _array.arrayReduce)(this.dependentContainers.values(), function (_ref8, container) {
+        var kept = _ref8.kept,
+            removed = _ref8.removed;
+
+        if (rowMatch(container) && colMatch(container)) {
+          removed.set(container.row + ', ' + container.column, container);
+        } else {
+          kept.set(container.row + ', ' + container.column, container);
+        }
+
+        return { kept: kept, removed: removed };
+      }, { kept: new Map(), removed: new Map() });
+
+      this.dependentContainers = split.kept;
+      return split.removed.values();
     }
 
     /**
@@ -99214,42 +99257,33 @@ function operate(start, amount) {
   amount = -amount;
 
   var matrix = this.matrix,
-      dataProvider = this.dataProvider,
-      sheet = this.sheet;
+      dataProvider = this.dataProvider;
 
   var translate = [0, amount];
   var indexOffset = Math.abs(amount) - 1;
 
-  var removedCellRef = matrix.removeCellRefsAtRange({ column: start }, { column: start + indexOffset });
-  var toRemove = [];
+  // remove deleted objects
+  matrix.removeCellRefsAtRange({ column: start }, { column: start + indexOffset });
+  var removedDependentContainers = matrix.removeDependentContainersAtRange({ column: start }, { column: start + indexOffset });
 
   (0, _array.arrayEach)(matrix.data.values(), function (cell) {
-    (0, _array.arrayEach)(removedCellRef, function (cellRef) {
-      if (!cell.hasPrecedent(cellRef)) {
-        return;
-      }
-
-      cell.removePrecedent(cellRef);
-      cell.setState(_value2.default.STATE_OUT_OFF_DATE);
-
-      (0, _array.arrayEach)(sheet.getCellDependencies(cell.row, cell.column), function (cellValue) {
-        cellValue.setState(_value2.default.STATE_OUT_OFF_DATE);
-      });
-    });
-
     if (cell.column >= start && cell.column <= start + indexOffset) {
-      toRemove.push(cell);
+      matrix.remove(cell);
     }
   });
 
-  matrix.remove(toRemove);
-
-  (0, _array.arrayEach)(matrix.cellReferences, function (cell) {
-    if (cell.column >= start) {
-      cell.translateTo.apply(cell, translate);
-    }
+  // update cells who were dependent on deleted cells
+  (0, _array.arrayEach)(removedDependentContainers, function (container) {
+    (0, _array.arrayEach)(container.getDependents(), function (depRef) {
+      var cellValue = matrix.getCellAt(depRef.row, depRef.column);
+      if (cellValue) {
+        cellValue.setState(_value2.default.STATE_OUT_OFF_DATE);
+        cellValue.removePrecedent(depRef);
+      }
+    });
   });
 
+  // translate values, refs, and dependent containers
   matrix.translateCells(start, translate);
 
   (0, _array.arrayEach)(matrix.data.values(), function (cell) {
@@ -99368,42 +99402,33 @@ function operate(start, amount) {
   amount = -amount;
 
   var matrix = this.matrix,
-      dataProvider = this.dataProvider,
-      sheet = this.sheet;
+      dataProvider = this.dataProvider;
 
   var translate = [amount, 0];
   var indexOffset = Math.abs(amount) - 1;
 
-  var removedCellRef = matrix.removeCellRefsAtRange({ row: start }, { row: start + indexOffset });
-  var toRemove = [];
+  // remove deleted objects
+  matrix.removeCellRefsAtRange({ column: start }, { column: start + indexOffset });
+  var removedDependentContainers = matrix.removeDependentContainersAtRange({ column: start }, { column: start + indexOffset });
 
   (0, _array.arrayEach)(matrix.data.values(), function (cell) {
-    (0, _array.arrayEach)(removedCellRef, function (cellRef) {
-      if (!cell.hasPrecedent(cellRef)) {
-        return;
-      }
-
-      cell.removePrecedent(cellRef);
-      cell.setState(_value2.default.STATE_OUT_OFF_DATE);
-
-      (0, _array.arrayEach)(sheet.getCellDependencies(cell.row, cell.column), function (cellValue) {
-        cellValue.setState(_value2.default.STATE_OUT_OFF_DATE);
-      });
-    });
-
     if (cell.row >= start && cell.row <= start + indexOffset) {
-      toRemove.push(cell);
+      matrix.remove(cell);
     }
   });
 
-  matrix.remove(toRemove);
-
-  (0, _array.arrayEach)(matrix.cellReferences, function (cell) {
-    if (cell.row >= start) {
-      cell.translateTo.apply(cell, translate);
-    }
+  // update cells who were dependent on deleted cells
+  (0, _array.arrayEach)(removedDependentContainers, function (container) {
+    (0, _array.arrayEach)(container.getDependents(), function (depRef) {
+      var cellValue = matrix.getCellAt(depRef.row, depRef.column);
+      if (cellValue) {
+        cellValue.setState(_value2.default.STATE_OUT_OFF_DATE);
+        cellValue.removePrecedent(depRef);
+      }
+    });
   });
 
+  // translate values, refs, and dependent containers
   matrix.translateCells(start, translate);
 
   (0, _array.arrayEach)(matrix.data.values(), function (cell) {
