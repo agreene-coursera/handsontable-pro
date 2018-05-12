@@ -133,8 +133,8 @@ class Sheet {
       arrayEach(rowData, (value, column) => {
         if (isFormulaExpression(value)) {
           const cellValue = new CellValue(row, column);
+          this.parseExpression(cellValue, value.substr(1));
           cellValue.setState(CellValue.STATE_OUT_OFF_DATE);
-          this.matrix.add(cellValue);
         }
       });
     });

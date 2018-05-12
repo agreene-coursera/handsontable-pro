@@ -24,40 +24,32 @@ export const OPERATION_NAME = 'remove_column';
 export function operate(start, amount, modifyFormula = true) {
   amount = -amount;
 
-  const {matrix, dataProvider, sheet} = this;
+  const {matrix, dataProvider} = this;
   const translate = [0, amount];
   const indexOffset = Math.abs(amount) - 1;
 
-  let removedCellRef = matrix.removeCellRefsAtRange({column: start}, {column: start + indexOffset});
-  let toRemove = [];
+  // remove deleted objects
+  matrix.removeCellRefsAtRange({column: start}, {column: start + indexOffset});
+  let removedDependentContainers = matrix.removeDependentContainersAtRange({column: start}, {column: start + indexOffset});
 
   arrayEach(matrix.data.values(), (cell) => {
-    arrayEach(removedCellRef, (cellRef) => {
-      if (!cell.hasPrecedent(cellRef)) {
-        return;
-      }
-
-      cell.removePrecedent(cellRef);
-      cell.setState(CellValue.STATE_OUT_OFF_DATE);
-
-      arrayEach(sheet.getCellDependencies(cell.row, cell.column), (cellValue) => {
-        cellValue.setState(CellValue.STATE_OUT_OFF_DATE);
-      });
-    });
-
     if (cell.column >= start && cell.column <= (start + indexOffset)) {
-      toRemove.push(cell);
+      matrix.remove(cell);
     }
   });
 
-  matrix.remove(toRemove);
-
-  arrayEach(matrix.cellReferences, (cell) => {
-    if (cell.column >= start) {
-      cell.translateTo(...translate);
-    }
+  // update cells who were dependent on deleted cells
+  arrayEach(removedDependentContainers, (container) => {
+    arrayEach(container.getDependents(), (depRef) => {
+      const cellValue = matrix.getCellAt(depRef.row, depRef.column);
+      if (cellValue) {
+        cellValue.setState(CellValue.STATE_OUT_OFF_DATE);
+        cellValue.removePrecedent(depRef);
+      }
+    });
   });
 
+  // translate values, refs, and dependent containers
   matrix.translateCells(start, translate);
 
   arrayEach(matrix.data.values(), (cell) => {

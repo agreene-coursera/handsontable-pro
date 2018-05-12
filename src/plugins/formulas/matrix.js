@@ -7,8 +7,8 @@ import CellValue from './cell/value';
  *
  * CellValue is an object which represents a formula expression. It contains a calculated value of that formula,
  * an error if applied and cell references. Cell references are CellReference object instances which represent a cell
- * in a spreadsheet. One CellReference can be assigned to multiple CellValues as a precedent cell. Each cell
- * modification triggers a search through CellValues that are dependent of the CellReference. After
+ * in a spreadsheet. Intercell dependencies are tracked in DependentContainers which represent. Each DependentContainer can contain one or more CellReference cell
+ * which denotes which cells are dependent on that cell. Each cell modification triggers a search through that cells dependentContainer to find which CellValues depend on that cell. After
  * the match, the cells are marked as 'out of date'. In the next render cycle, all CellValues marked with
  * that state are recalculated.
  *
@@ -24,7 +24,7 @@ class Matrix {
      */
     this.t = recordTranslator;
     /**
-     * List of all cell values with theirs precedents.
+     * List of all cell values
      *
      * @type {Map}
      */
@@ -138,6 +138,13 @@ class Matrix {
       map.set(`${cell.row}, ${cell.column}`, cell);
       return map;
     }, new Map());
+
+    // translate all cell references
+    arrayEach(this.cellReferences, (cell) => {
+      if ((axis === 'row' && cell.row >= start) || (axis === 'col' && cell.column >= start)) {
+        cell.translateTo(...translate);
+      }
+    });
   }
 
   /**
@@ -192,8 +199,6 @@ class Matrix {
     this.cellReferences = arrayFilter(this.cellReferences, (cell) => {
       if (rowMatch(cell) && colMatch(cell)) {
         removed.push(cell);
-        this.dependentContainers.delete(`${cell.row}, ${cell.column}`);
-
         return false;
       }
 
@@ -201,6 +206,31 @@ class Matrix {
     });
 
     return removed;
+  }
+
+  /**
+   * Remove dependent Containers from the collection.
+   *
+   * @param {Object} start Start visual coordinate.
+   * @param {Object} end End visual coordinate.
+   * @returns {Array} Returns removed cell references.
+   */
+  removeDependentContainersAtRange({row: startRow, column: startColumn}, {row: endRow, column: endColumn}) {
+    const rowMatch = (cell) => (startRow === void 0 ? true : cell.row >= startRow && cell.row <= endRow);
+    const colMatch = (cell) => (startColumn === void 0 ? true : cell.column >= startColumn && cell.column <= endColumn);
+
+    const split = arrayReduce(this.dependentContainers.values(), ({ kept, removed }, container) => {
+      if (rowMatch(container) && colMatch(container)) {
+        removed.set(`${container.row}, ${container.column}`, container);
+      } else {
+        kept.set(`${container.row}, ${container.column}`, container);
+      }
+
+      return ({ kept, removed });
+    }, { kept: new Map(), removed: new Map() });
+
+    this.dependentContainers = split.kept;
+    return split.removed.values();
   }
 
   /**
