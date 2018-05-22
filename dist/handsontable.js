@@ -21,7 +21,7 @@
  * UNINTERRUPTED OR ERROR FREE.
  * 
  * Version: 2.0.0
- * Release date: 11/04/2018 (built at 17/05/2018 13:11:02)
+ * Release date: 11/04/2018 (built at 22/05/2018 13:54:09)
  */
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
@@ -14518,7 +14518,6 @@ function Core(rootElement, userSettings) {
       return recordTranslator.toVisualRow(row);
     });
 
-    instance.forceFullRender = true; // used when data was changed
     grid.adjustRowsAndCols();
     instance.runHooks('beforeChangeRender', changes, source);
     editorManager.lockEditor();
@@ -15859,6 +15858,7 @@ function Core(rootElement, userSettings) {
       priv.cellSettings[physicalRow][physicalColumn] = new priv.columnSettings[physicalColumn]();
     }
     priv.cellSettings[physicalRow][physicalColumn][key] = val;
+
     instance.runHooks('afterSetCellMeta', row, col, key, val);
   };
 
@@ -17068,7 +17068,7 @@ function Core(rootElement, userSettings) {
    */
   this._renderChangedRows = function (changedRows) {
     editorManager.destroyEditor(null);
-    instance.view.render(changedRows);
+    instance.view.selectiveRender(changedRows);
 
     if (selection.isSelected()) {
       editorManager.prepareEditor();
@@ -23547,6 +23547,26 @@ var Walkontable = function () {
     }
 
     /**
+     * Force a portion of Walkontable's rows to rerender
+     *
+     * @param {Array} rowsToDraw array of visualRowIndexes to specifically render
+     * @returns {Walkontable}
+     */
+
+  }, {
+    key: 'selectiveDraw',
+    value: function selectiveDraw(rowsToDraw) {
+      this.drawInterrupted = false;
+      if (!(0, _element.isVisible)(this.wtTable.TABLE)) {
+        // draw interrupted because TABLE is not visible
+        this.drawInterrupted = true;
+      } else {
+        this.wtTable.selectiveDraw(rowsToDraw);
+      }
+      return this;
+    }
+
+    /**
      * Returns the TD at coords. If topmost is set to true, returns TD from the topmost overlay layer,
      * if not set or set to false, returns TD from the master table.
      *
@@ -25453,7 +25473,6 @@ var Table = function () {
      * Redraws the table
      *
      * @param {Boolean} fastDraw If TRUE, will try to avoid full redraw and only update the border positions. If FALSE or UNDEFINED, will perform a full redraw
-     * @param {Array} array of visualRowIndexs to specifically render
      * @returns {Table}
      */
 
@@ -25551,6 +25570,19 @@ var Table = function () {
       this.wot.drawn = true;
 
       return this;
+    }
+
+    /*
+     * Triggers rendering of just specific rows
+     * @param {Array} rowsToDraw array of visualRowIndexs to specifically render
+     */
+
+  }, {
+    key: 'selectiveDraw',
+    value: function selectiveDraw(rowsToDraw) {
+      var wtRenderer = new _tableRenderer2.default(this);
+
+      wtRenderer.selectiveRender(rowsToDraw);
     }
   }, {
     key: '_doDraw',
@@ -25762,6 +25794,11 @@ var Table = function () {
     key: 'getFirstRenderedRow',
     value: function getFirstRenderedRow() {
       return this.wot.wtViewport.rowsRenderCalculator.startRow;
+    }
+  }, {
+    key: 'getFirstRenderedRowSourceIndex',
+    value: function getFirstRenderedRowSourceIndex() {
+      return this.wot.wtViewport.firstRenderedSourceIndex;
     }
   }, {
     key: 'getFirstVisibleRow',
@@ -26069,11 +26106,11 @@ var TableRenderer = function () {
     this.columnHeaderCount = 0;
     this.fixedRowsTop = 0;
     this.fixedRowsBottom = 0;
+    this.firstRenderedSourceIndex = 0;
   }
 
   /**
-   * Renders table or specific rows if specified
-   * @param {Array} array of visualRowIndexs to specifically render
+   * Renders table
    */
 
 
@@ -26103,6 +26140,15 @@ var TableRenderer = function () {
       var workspaceWidth = void 0;
       var adjusted = false;
 
+      if (rowsToRender && totalColumns >= 0) {
+        this.renderSpecificRows(rowsToRender, columnsToRender);
+        if (!this.wtTable.isWorkingOnClone()) {
+          this.wot.wtViewport.createVisibleCalculators();
+        }
+        this.wot.getSetting('onDraw', true);
+        return;
+      }
+
       if (_base2.default.isOverlayTypeOf(this.wot.cloneOverlay, _base2.default.CLONE_BOTTOM) || _base2.default.isOverlayTypeOf(this.wot.cloneOverlay, _base2.default.CLONE_BOTTOM_LEFT_CORNER)) {
 
         // do NOT render headers on the bottom or bottom-left corner overlay
@@ -26118,13 +26164,8 @@ var TableRenderer = function () {
         // adjust column widths according to user widths settings
         this.renderColumnHeaders();
 
-        // Render table rows
-        if (rowsToRender) {
-          this.renderSpecificRows(rowsToRender, columnsToRender);
-        } else {
-          this.renderRows(totalRows, defaultRowsToRender, columnsToRender);
-          this.removeRedundantRows(defaultRowsToRender);
-        }
+        this.renderRows(totalRows, defaultRowsToRender, columnsToRender);
+        this.removeRedundantRows(defaultRowsToRender);
 
         if (!this.wtTable.isWorkingOnClone()) {
           workspaceWidth = this.wot.wtViewport.getWorkspaceWidth();
@@ -26193,6 +26234,24 @@ var TableRenderer = function () {
     }
 
     /**
+     * Renders specific rows in the table
+     * @param {Array} rowsToRender array of visualRowIndexs to specifically render
+     */
+
+  }, {
+    key: 'selectiveRender',
+    value: function selectiveRender(rowsToRender) {
+      var columnsToRender = this.wtTable.getRenderedColumnsCount();
+      var totalColumns = this.wot.getSetting('totalColumns');
+
+      if (rowsToRender && totalColumns >= 0) {
+        this.renderSpecificRows(rowsToRender, columnsToRender);
+      }
+
+      this.wot.getSetting('onDraw', true);
+    }
+
+    /**
      * @param {Number} renderedRowsCount
      */
 
@@ -26218,9 +26277,9 @@ var TableRenderer = function () {
 
       var isWorkingOnClone = this.wtTable.isWorkingOnClone();
 
-      rowsToRender.forEach(function (visibleRowIndex) {
-        var sourceRowIndex = _this.rowFilter.renderedToSource(visibleRowIndex);
-        var TR = _this.createAndReplaceTrForRow(visibleRowIndex);
+      rowsToRender.forEach(function (sourceRowIndex) {
+        var renderedRowIndex = sourceRowIndex - _this.wtTable.getFirstRenderedRowSourceIndex();
+        var TR = _this.createAndReplaceTrForRow(renderedRowIndex);
 
         // Render row headers
         _this.renderRowHeaders(sourceRowIndex, TR);
@@ -26266,6 +26325,9 @@ var TableRenderer = function () {
       var visibleRowIndex = 0;
       var sourceRowIndex = this.rowFilter.renderedToSource(visibleRowIndex);
       var isWorkingOnClone = this.wtTable.isWorkingOnClone();
+      if (!isWorkingOnClone) {
+        this.wot.wtViewport.setFirstRenderedRowSourceIndex(sourceRowIndex);
+      }
 
       while (sourceRowIndex < totalRows && sourceRowIndex >= 0) {
         if (!performanceWarningAppeared && visibleRowIndex > 1000) {
@@ -26889,6 +26951,7 @@ var Viewport = function () {
     this.rowHeaderWidth = NaN;
     this.rowsVisibleCalculator = null;
     this.columnsVisibleCalculator = null;
+    this.firstRenderedSourceIndex = 0;
 
     this.eventManager = new _eventManager2.default(this.wot);
     this.eventManager.addEventListener(window, 'resize', function () {
@@ -27321,6 +27384,17 @@ var Viewport = function () {
     value: function createVisibleCalculators() {
       this.rowsVisibleCalculator = this.createRowsCalculator(true);
       this.columnsVisibleCalculator = this.createColumnsCalculator(true);
+    }
+
+    /**
+     * Saves off the first rendered row's source index so when replacing rows we can know the sourceIndex of the first tr in TBODY
+     * @param {number} sourceIndex of the first rendered row
+     */
+
+  }, {
+    key: 'setFirstRenderedRowSourceIndex',
+    value: function setFirstRenderedRowSourceIndex(sourceIndex) {
+      this.firstRenderedSourceIndex = sourceIndex;
     }
 
     /**
@@ -37546,7 +37620,7 @@ Handsontable.DefaultSettings = _defaultSettings2.default;
 Handsontable.EventManager = _eventManager2.default;
 Handsontable._getListenersCounter = _eventManager.getListenersCounter; // For MemoryLeak tests
 
-Handsontable.buildDate = '17/05/2018 13:11:02';
+Handsontable.buildDate = '22/05/2018 13:54:09';
 Handsontable.packageName = 'handsontable-pro';
 Handsontable.version = '2.0.0';
 
@@ -43690,6 +43764,16 @@ TableView.prototype.render = function () {
 
   this.wt.draw(!this.instance.forceFullRender, rowsToRender);
   this.instance.forceFullRender = false;
+  this.instance.renderCall = false;
+};
+
+/**
+ * Renders specific rows in the table
+ *
+ * @param {Array} array of visual row indexs to render
+ */
+TableView.prototype.selectiveRender = function (rowsToRender) {
+  this.wt.selectiveDraw(rowsToRender);
   this.instance.renderCall = false;
 };
 
