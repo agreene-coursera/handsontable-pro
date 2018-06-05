@@ -2776,8 +2776,8 @@ handlebars@^4.0.3:
     uglify-js "^2.6"
 
 "handsontable@https://github.com/agreene-coursera/handsontable.git#jagreene/render-specific-rows":
-  version "2.0.0"
-  resolved "https://github.com/agreene-coursera/handsontable.git#bc6c9d39367873454a8f07cc3fd30d6696a96a6b"
+  version "3.0.0"
+  resolved "https://github.com/agreene-coursera/handsontable.git#6bee0e9dfc667d20319fc29b1942028f8abb2edf"
   dependencies:
     moment "2.20.1"
     numbro "1.11.0"
