@@ -21,7 +21,7 @@
  * UNINTERRUPTED OR ERROR FREE.
  * 
  * Version: 2.0.0
- * Release date: 11/04/2018 (built at 05/06/2018 10:35:10)
+ * Release date: 11/04/2018 (built at 13/07/2018 13:35:19)
  */
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
@@ -13430,7 +13430,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
 
-var _templateObject = _taggedTemplateLiteral(['Deprecation warning: This method is going to be removed in the next release. \n      If you want to select a cell using props, please use the `selectCell` method.'], ['Deprecation warning: This method is going to be removed in the next release. \n      If you want to select a cell using props, please use the \\`selectCell\\` method.']);
+var _templateObject = _taggedTemplateLiteral(['Deprecation warning: This method is going to be removed in the next release.\n      If you want to select a cell using props, please use the `selectCell` method.'], ['Deprecation warning: This method is going to be removed in the next release.\n      If you want to select a cell using props, please use the \\`selectCell\\` method.']);
 
 exports.default = Core;
 
@@ -14401,14 +14401,11 @@ function Core(rootElement, userSettings) {
     return numericData;
   }
 
-  function validateChanges(changes, source, callback) {
-    var waitingForValidator = new ValidatorsQueue();
-    var isNumericData = function isNumericData(value) {
-      return value.length > 0 && /^-?[\d\s]*(\.|,)?\d*$/.test(value);
-    };
+  function isNumericData(value) {
+    return value.length > 0 && /^-?[\d\s]*(\.|,)?\d*$/.test(value);
+  };
 
-    waitingForValidator.onQueueEmpty = resolve;
-
+  function formatChanges(changes) {
     for (var i = changes.length - 1; i >= 0; i--) {
       if (changes[i] === null) {
         changes.splice(i, 1);
@@ -14424,28 +14421,40 @@ function Core(rootElement, userSettings) {
         if (cellProperties.type === 'numeric' && typeof newValue === 'string' && isNumericData(newValue)) {
           changes[i][3] = getParsedNumber(newValue);
         }
-
-        /* eslint-disable no-loop-func */
-        if (instance.getCellValidator(cellProperties)) {
-          waitingForValidator.addValidatorToQueue();
-          instance.validateCell(changes[i][3], cellProperties, function (i, cellProperties) {
-            return function (result) {
-              if (typeof result !== 'boolean') {
-                throw new Error('Validation error: result is not boolean');
-              }
-              if (result === false && cellProperties.allowInvalid === false) {
-                changes.splice(i, 1); // cancel the change
-                cellProperties.valid = true; // we cancelled the change, so cell value is still valid
-                var cell = instance.getCell(cellProperties.visualRow, cellProperties.visualCol);
-                (0, _element.removeClass)(cell, instance.getSettings().invalidCellClassName);
-                --i;
-              }
-              waitingForValidator.removeValidatorFormQueue();
-            };
-          }(i, cellProperties), source);
-        }
       }
     }
+  }
+
+  function validateChanges(changes, source, callback) {
+    var waitingForValidator = new ValidatorsQueue();
+    waitingForValidator.onQueueEmpty = resolve;
+
+    for (var i = changes.length - 1; i >= 0; i--) {
+      var row = changes[i][0];
+      var col = datamap.propToCol(changes[i][1]);
+
+      var cellProperties = instance.getCellMeta(row, col);
+      /* eslint-disable no-loop-func */
+      if (instance.getCellValidator(cellProperties)) {
+        waitingForValidator.addValidatorToQueue();
+        instance.validateCell(changes[i][3], cellProperties, function (i, cellProperties) {
+          return function (result) {
+            if (typeof result !== 'boolean') {
+              throw new Error('Validation error: result is not boolean');
+            }
+            if (result === false && cellProperties.allowInvalid === false) {
+              changes.splice(i, 1); // cancel the change
+              cellProperties.valid = true; // we cancelled the change, so cell value is still valid
+              var cell = instance.getCell(cellProperties.visualRow, cellProperties.visualCol);
+              (0, _element.removeClass)(cell, instance.getSettings().invalidCellClassName);
+              --i;
+            }
+            waitingForValidator.removeValidatorFormQueue();
+          };
+        }(i, cellProperties), source);
+      }
+    }
+
     waitingForValidator.checkIfQueueIsEmpty();
 
     function resolve() {
@@ -14646,6 +14655,8 @@ function Core(rootElement, userSettings) {
       source = col;
     }
 
+    formatChanges(changes);
+
     instance.runHooks('afterSetDataAtCell', changes, source);
 
     validateChanges(changes, source, function () {
@@ -14679,6 +14690,8 @@ function Core(rootElement, userSettings) {
     if (!source && (typeof row === 'undefined' ? 'undefined' : _typeof(row)) === 'object') {
       source = prop;
     }
+
+    formatChanges(changes);
 
     instance.runHooks('afterSetDataAtRowProp', changes, source);
 
@@ -17070,8 +17083,18 @@ function Core(rootElement, userSettings) {
    * @param {Array} Array of visualRowIndexs that map to the changedRows
    */
   this._renderChangedRows = function (changedRows) {
+    /*
+     * Filtered rows get incorrecly translated indexes leading to null visual indexes
+     * which we should filter out before attempting to re-render.
+     * Underlying issue is possibly in the RecordTranslator logic.
+     * (https://github.com/handsontable/handsontable/issues/4442)
+     */
+    var validChangedRows = changedRows.filter(function (rowIndex) {
+      return rowIndex !== null;
+    });
+
     editorManager.destroyEditor(null);
-    instance.view.selectiveRender(changedRows);
+    instance.view.selectiveRender(validChangedRows);
 
     if (selection.isSelected()) {
       editorManager.prepareEditor();
@@ -26548,9 +26571,6 @@ var TableRenderer = function () {
         if (visibleColIndex === 0) {
           TD = TR.childNodes[this.columnFilter.sourceColumnToVisibleRowHeadedColumn(sourceColIndex)];
         } else {
-          if (!TD.nextSibling) {
-            debugger;
-          }
           TD = TD.nextSibling; // http://jsperf.com/nextsibling-vs-indexed-childnodes
         }
         // If the number of headers has been reduced, we need to replace excess TH with TD
@@ -37638,7 +37658,7 @@ Handsontable.DefaultSettings = _defaultSettings2.default;
 Handsontable.EventManager = _eventManager2.default;
 Handsontable._getListenersCounter = _eventManager.getListenersCounter; // For MemoryLeak tests
 
-Handsontable.buildDate = '05/06/2018 10:35:10';
+Handsontable.buildDate = '13/07/2018 13:35:19';
 Handsontable.packageName = 'handsontable-pro';
 Handsontable.version = '2.0.0';
 
